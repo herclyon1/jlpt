@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>N1 文法速判训练器</title>
+<style>
+:root{--bg:#f7f7f5;--card:#fff;--ink:#1a1a1a;--muted:#6b6b6b;--line:#e3e3df;
+  --ok:#1a7f37;--ok-bg:#e6f4ea;--ng:#c62828;--ng-bg:#fdecea;--acc:#3b5bdb;--warn:#b26a00}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#161618;--card:#212124;--ink:#e8e8e6;--muted:#9a9a98;--line:#3a3a3e;
+  --ok:#4caf72;--ok-bg:#173222;--ng:#ef6b5e;--ng-bg:#3a1f1c;--acc:#7b96ff;--warn:#e0a63f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);line-height:1.6;
+  font-family:"Hiragino Sans","PingFang SC","Microsoft YaHei",sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:20px 20px 60px}
+h1{font-size:19px;margin:0 0 2px}
+.sub{color:var(--muted);font-size:12.5px;margin-bottom:16px}
+.bar{height:5px;background:var(--line);border-radius:3px;overflow:hidden;margin-bottom:14px}
+.bar>i{display:block;height:100%;background:var(--acc);width:100%;transition:width .1s linear}
+.bar.hot>i{background:var(--warn)}.bar.dead>i{background:var(--ng)}
+.stem{background:var(--card);border:1px solid var(--line);border-radius:10px;
+  padding:22px 20px;min-height:116px;display:grid;align-content:center}
+.stem p{margin:0;font-size:19px;line-height:1.95;letter-spacing:.4px;text-align:justify}
+.stem b{color:var(--acc);font-weight:700;background:rgba(59,91,219,.09);
+  border-radius:4px;padding:1px 3px;white-space:nowrap}
+.opts{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+.opt{background:var(--card);border:1.5px solid var(--line);border-radius:9px;padding:11px 15px;
+  font-size:17px;cursor:pointer;text-align:left;color:var(--ink);transition:.08s;
+  display:flex;align-items:baseline;gap:12px;letter-spacing:.4px}
+.opt:hover{border-color:var(--acc)}
+.opt kbd{color:var(--muted);font-size:12px;font-family:ui-monospace,Menlo,monospace;
+  flex:0 0 16px;text-align:center}
+.opt span{flex:1}
+.opt.ok{background:var(--ok-bg);border-color:var(--ok);color:var(--ok);font-weight:700}
+.opt.ng{background:var(--ng-bg);border-color:var(--ng);color:var(--ng)}
+.meta{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:12px;flex-wrap:wrap;gap:8px}
+.hint{margin-top:10px;padding:9px 12px;border-radius:8px;background:var(--ok-bg);color:var(--ok);font-size:13.5px;display:none}
+.hint.show{display:block}
+.stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.st{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--muted)}
+.st b{color:var(--ink);font-size:16px;margin-right:3px}
+.ctl{margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+button.b{padding:7px 16px;border:1px solid var(--line);background:var(--card);color:var(--ink);
+  border-radius:7px;cursor:pointer;font-size:13px}
+select{padding:6px 10px;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--ink)}
+.done{text-align:center;padding:40px 20px;color:var(--muted)}
+</style>
+</head>
+<body><div class="wrap">
+<h1>N1 文法速判训练器</h1>
+<div class="sub"><b>两段式：读句子不限时，选项出现后才计时。</b>第一段慢慢读，读懂了按 <b>空格</b>；选项一出来立刻按 <b>1 2 3 4</b>。<br>计时只压"判断"不压"阅读"——压阅读测的是眼睛不是语感。读的时候看不到选项，你会不自觉预判该填什么，那比从四个里认更练语感。答错不给语法讲解（讲解会把记忆写回易遗忘的陈述层），只有<b>第一次</b>答错给一次词义。</div>
+<div class="stats" id="stats"></div>
+<div class="bar" id="bar"><i></i></div>
+<div class="stem" id="stem">载入中…</div>
+<div class="opts" id="opts"></div>
+<div id="go" style="margin-top:12px;text-align:center"><button class="b" style="padding:11px 34px;font-size:15px" onclick="reveal()">读懂了 → 出选项（空格）</button></div>
+<div class="hint" id="hint"></div>
+<div class="meta"><span id="src"></span><span id="prog"></span></div>
+<div class="ctl">
+  判断限时 <select id="lim">
+    <option value="1500">1.5 秒</option><option value="2000">2.0 秒</option>
+    <option value="2500" selected>2.5 秒</option><option value="3500">3.5 秒</option>
+    <option value="5000">5 秒(入门)</option><option value="0">不限时</option></select>
+  <button class="b" onclick="reset()">清空进度</button>
+  <span id="msg"></span>
+</div>
+<div style="margin-top:22px;font-size:11.5px;color:var(--muted);line-height:1.7" id="attrib">
+题库：JLPT 真题 53 题 + 《新完全掌握 N1/N2 语法》例句 662 题（例句数据来自 GitHub
+<code>mxggle/anki-jlpt-n1(n2)-grammar-example-sentences</code>，CC BY-NC 4.0，仅供个人学习使用）。
+干扰项由接续类+形状匹配自动生成，并过滤掉语义可能重合的候选；若遇到你认为两个选项都成立的题，那是自动生成的漏网，跳过即可。
+</div>
+</div>
+<script>
+const ITEMS = /*__ITEMS__*/;
+const KEY = "n1drill_v3";
+const IV = [0, 0.002, 0.02, 0.5, 2, 6, 18, 50];   // 扩展间隔(天)
+let S = load(), q = [], cur = null, tRead = 0, tJudge = 0, tid = null,
+    phase = 0, seen = 0, right = 0, rts = [], reads = [];
+
+function load(){ try{ const v=JSON.parse(localStorage.getItem(KEY)); if(v&&v.d) return v; }catch(e){}
+  return {d:{},tot:0,ok:0}; }
+function save(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} }
+function st(i){ return S.d[i] || (S.d[i]={b:0,due:0,n:0,w:0,first:1}); }
+
+function build(){
+  const now=Date.now(), due=[], fresh=[], FRESH=28;
+  ITEMS.forEach((_,i)=>{ const x=st(i); if(x.n===0) fresh.push(i); else if(x.due<=now) due.push(i); });
+  due.sort(()=>Math.random()-0.5); fresh.sort(()=>Math.random()-0.5);
+  q=[]; let a=0,b=0;
+  while(a<due.length || (b<fresh.length && b<FRESH)){
+    if(a<due.length) q.push(due[a++]);
+    if(b<fresh.length && b<FRESH && (a%3===0 || a>=due.length)) q.push(fresh[b++]);
+  }
+}
+function avg(A){ return A.length ? (A.reduce((x,y)=>x+y,0)/A.length/1000).toFixed(2) : "–"; }
+function stats(){
+  let auto=0,tr=0,unseen=0;
+  ITEMS.forEach((_,i)=>{ const x=S.d[i]; if(!x||!x.n) unseen++; else if(x.b>=5) auto++; else tr++; });
+  document.getElementById('stats').innerHTML =
+    `<div class="st"><b>${auto}</b>已自动化</div><div class="st"><b>${tr}</b>训练中</div>`+
+    `<div class="st"><b>${unseen}</b>未见</div>`+
+    `<div class="st"><b>${seen?Math.round(100*right/seen):0}%</b>本次正确率</div>`+
+    `<div class="st">判断 <b>${avg(rts)}</b>s</div><div class="st">阅读 <b>${avg(reads)}</b>s</div>`+
+    `<div class="st">累计 <b>${S.tot}</b> 次</div>`;
+}
+function next(){
+  clearInterval(tid); phase=0;
+  document.getElementById('hint').className='hint';
+  if(!q.length) build();
+  if(!q.length){
+    document.getElementById('stem').innerHTML='<div class="done">本轮到期项已练完。<br>间隔重现的价值就在于<b>等</b>——隔一段时间再来，那次提取才有强化作用。</div>';
+    document.getElementById('opts').innerHTML=''; document.getElementById('go').style.display='none';
+    document.getElementById('bar').firstElementChild.style.width='0%'; stats(); return;
+  }
+  cur=q.shift();
+  const it=ITEMS[cur], x=st(cur);
+  document.getElementById('stem').innerHTML='<p>'+it.q.replace('（　）','<b>（　）</b>')+'</p>';
+  document.getElementById('opts').innerHTML='';
+  document.getElementById('go').style.display='';
+  const bar=document.getElementById('bar'); bar.className='bar'; bar.firstElementChild.style.width='100%';
+  document.getElementById('src').textContent=`${it.s}${it.e!=='語料'?'·'+it.e:''}　这题练过 ${x.n} 次${x.w?'，错 '+x.w+' 次':''}`;
+  document.getElementById('prog').textContent=`队列剩 ${q.length}　·　第1段：读，不计时`;
+  tRead=Date.now();
+}
+function reveal(){
+  if(phase!==0) return; phase=1;
+  reads.push(Date.now()-tRead);
+  const it=ITEMS[cur];
+  document.getElementById('go').style.display='none';
+  document.getElementById('opts').innerHTML=it.o.map((o,k)=>
+    `<button class="opt" data-k="${k}" onclick="pick(${k})"><kbd>${k+1}</kbd><span>${o}</span></button>`).join('');
+  document.getElementById('prog').textContent=`队列剩 ${q.length}　·　第2段：判断，计时中`;
+  tJudge=Date.now();
+  const lim=+document.getElementById('lim').value, bar=document.getElementById('bar');
+  if(!lim){ bar.className='bar'; bar.firstElementChild.style.width='100%'; return; }
+  tid=setInterval(()=>{
+    const el=Date.now()-tJudge, p=Math.max(0,1-el/lim);
+    bar.firstElementChild.style.width=(p*100)+'%';
+    bar.className='bar'+(p<.25?' dead':p<.5?' hot':'');
+    if(el>=lim){ clearInterval(tid); pick(-1); }
+  },40);
+}
+function pick(k){
+  if(phase!==1) return; phase=2; clearInterval(tid);
+  const it=ITEMS[cur], x=st(cur), ok=(k===it.a), rt=Date.now()-tJudge;
+  seen++; if(ok){ right++; rts.push(rt); }
+  S.tot++; if(ok) S.ok++;
+  x.n++; if(!ok) x.w++;
+  x.b = ok ? Math.min(x.b+1, IV.length-1) : Math.max(0, x.b-2);
+  x.due = Date.now() + IV[x.b]*86400000;
+  document.querySelectorAll('.opt').forEach(b=>{
+    const bk=+b.dataset.k;
+    if(bk===it.a) b.classList.add('ok'); else if(bk===k) b.classList.add('ng');
+  });
+  let shown=false;
+  if(!ok && x.first && it.m){ x.first=0; shown=true;
+    const h=document.getElementById('hint'); h.textContent='「'+it.o[it.a]+'」= '+it.m; h.className='hint show'; }
+  if(!ok) q.splice(Math.min(6,q.length),0,cur);
+  save(); stats();
+  setTimeout(next, ok?450:(shown?1900:1100));
+}
+document.addEventListener('keydown', e=>{
+  if(e.key===' '){ e.preventDefault(); if(phase===0) reveal(); return; }
+  if(e.key>='1'&&e.key<='4' && phase===1) pick(+e.key-1);
+});
+function reset(){ if(confirm('清空全部训练进度？')){ S={d:{},tot:0,ok:0}; save(); seen=right=0; rts=[]; reads=[]; build(); next(); } }
+build(); stats(); next();
+</script>
+</body></html>

@@ -1,0 +1,9 @@
+*.pkl
+combined.js
+_*.js
+_*.md
+Unihan*.txt
+Unihan.zip
+*.tsv
+node_modules/
+.DS_Store

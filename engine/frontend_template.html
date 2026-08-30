@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JLPT 规则判题机</title>
+<style>
+:root{
+  --bg:#f7f7f5; --card:#ffffff; --ink:#1a1a1a; --muted:#6b6b6b; --line:#e3e3df;
+  --sure:#1a7f37; --sure-bg:#e6f4ea; --elim:#b26a00; --elim-bg:#fff3e0;
+  --none:#8a8a8a; --none-bg:#f0f0ee; --acc:#3b5bdb; --bad:#c62828; --bad-bg:#fdecea;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#161618; --card:#212124; --ink:#e8e8e6; --muted:#9a9a98; --line:#3a3a3e;
+  --sure:#4caf72; --sure-bg:#173222; --elim:#e0a63f; --elim-bg:#332a14;
+  --none:#8a8a8a; --none-bg:#2a2a2d; --acc:#7b96ff; --bad:#ef6b5e; --bad-bg:#3a1f1c;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.6}
+header{padding:18px 24px 0;max-width:1100px;margin:0 auto}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+main{max-width:1100px;margin:0 auto;padding:0 24px 60px}
+.tabs{display:flex;gap:6px;margin-bottom:-1px}
+.tab{padding:9px 20px;border:1px solid var(--line);border-bottom:none;border-radius:8px 8px 0 0;background:var(--none-bg);cursor:pointer;font-size:14px;color:var(--muted)}
+.tab.active{background:var(--card);color:var(--ink);font-weight:600}
+.panel{display:none;background:var(--card);border:1px solid var(--line);border-radius:0 10px 10px 10px;padding:16px}
+.panel.active{display:block}
+textarea{width:100%;height:220px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:ui-monospace,Menlo,monospace;font-size:13px;resize:vertical}
+button.run{margin-top:10px;padding:9px 26px;font-size:15px;border:none;border-radius:8px;background:var(--acc);color:#fff;cursor:pointer}
+button.run:active{opacity:.8}
+.statbar{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
+.stat{padding:8px 14px;border-radius:8px;font-size:13px}
+.stat b{font-size:18px;margin-right:2px}
+.st-sure{background:var(--sure-bg);color:var(--sure)}
+.st-elim{background:var(--elim-bg);color:var(--elim)}
+.st-none{background:var(--none-bg);color:var(--none)}
+.st-lean{background:#e8eeff;color:#3b4fa8}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .st-lean{background:#1c2340;color:#9db0ff} }
+.b-lean{background:#e8eeff;color:#3b4fa8}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .b-lean{background:#1c2340;color:#9db0ff} }
+.opt.lean{color:#3b4fa8;font-weight:600}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .opt.lean{color:#9db0ff} }
+.st-acc{background:var(--bad-bg);color:var(--bad)}
+.qcard{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:8px 0;background:var(--card)}
+.qhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{font-size:12px;padding:2px 10px;border-radius:99px;font-weight:600}
+.b-sure{background:var(--sure-bg);color:var(--sure)}
+.b-elim{background:var(--elim-bg);color:var(--elim)}
+.b-none{background:var(--none-bg);color:var(--none)}
+.b-wrong{background:var(--bad-bg);color:var(--bad)}
+.qnum{font-weight:700}
+.qstem{margin:6px 0 4px;font-size:14px}
+.opts{margin:2px 0;font-size:13px}
+.opt{padding:1px 0}
+.opt.picked{color:var(--sure);font-weight:700}
+.opt.dead{color:var(--muted);text-decoration:line-through}
+.opt.key::after{content:" ← 官方答案";color:var(--acc);font-size:12px}
+.why{font-size:12px;color:var(--muted);margin-top:4px;border-top:1px dashed var(--line);padding-top:4px}
+.why b{color:var(--ink)}
+.daihead{margin:18px 0 4px;font-size:14px;color:var(--muted);font-weight:600}
+details.cards{margin:14px 0}
+details.cards summary{cursor:pointer;color:var(--acc);font-size:14px}
+.cardlist{font-size:13px;padding:8px 0}
+.cardlist div{padding:3px 0;border-bottom:1px dashed var(--line)}
+.cardlist span{display:inline-block;min-width:36px;font-weight:700;color:var(--acc)}
+.empty{color:var(--muted);padding:30px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>JLPT 规则判题机</h1>
+  <div class="sub">粘贴标准格式卷面 → 一键判题。四档输出：<b style="color:var(--sure)">确答</b>（规则确定性决定，4套真题18/18全对）· <b style="color:#3b4fa8">倾向</b>（概率性推荐，附实测命中率，<b>不是确定答案</b>）· <b style="color:var(--elim)">排除</b>（划掉≥2个）· <b style="color:var(--none)">无覆盖</b>（靠你）。全部规则均在 4 套真题 384 题上留一验证过，未通过验证的已删除。</div>
+</header>
+<main>
+<div class="tabs">
+  <div class="tab active" data-t="0">言語知識</div>
+  <div class="tab" data-t="1">読解</div>
+  <div class="tab" data-t="2">聴解</div>
+</div>
+<div class="panel active" id="p0"><textarea id="in0" placeholder="#卷 2024-12 N1&#10;#科 言語知識&#10;#大題 問題1&#10;#題 1&#10;#干 …＜真相＞…&#10;#选 1 しんそう&#10;…"></textarea><br><button class="run" onclick="go(0)">判题 ▶</button><div id="out0"></div></div>
+<div class="panel" id="p1"><textarea id="in1" placeholder="#卷 2024-12 N1&#10;#科 読解&#10;#文 A1&#10;（正文）&#10;#文完&#10;#大題 問題8&#10;#題 46 @文 A1&#10;…"></textarea><br><button class="run" onclick="go(1)">判题 ▶</button><div id="out1"></div></div>
+<div class="panel" id="p2"><textarea id="in2" placeholder="#卷 2024-12 N1&#10;#科 聴解&#10;#大題 問題4&#10;#文 K1&#10;（听力台本）&#10;#文完&#10;#題 1 @文 K1&#10;…"></textarea><br><button class="run" onclick="go(2)">判题 ▶</button><div id="out2"></div></div>
+<details class="cards"><summary>📇 规则卡片全表（背这些）</summary><div class="cardlist" id="cards"></div></details>
+</main>
+<script>
+/*__ENGINE__*/
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active'); document.getElementById('p'+t.dataset.t).classList.add('active');
+});
+const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+(function(){ const c = document.getElementById('cards');
+  c.innerHTML = Object.entries(CARDS).map(([k,v])=>`<div><span>${k}</span>${esc(v)}</div>`).join(""); })();
+try{ ["in0","in1","in2"].forEach(id=>{ const v=localStorage.getItem("jlpt_"+id); if(v) document.getElementById(id).value=v; }); }catch(e){}
+function go(n){
+  const text = document.getElementById('in'+n).value;
+  try{ localStorage.setItem("jlpt_in"+n, text); }catch(e){}
+  const out = document.getElementById('out'+n);
+  if(!text.trim()){ out.innerHTML = '<div class="empty">先粘贴卷面文本</div>'; return; }
+  let run;
+  try{ run = runExam(text); }catch(e){ out.innerHTML = '<div class="empty">解析出错：'+esc(e.message)+'</div>'; return; }
+  const s = run.stats;
+  let html = `<div class="statbar">
+    <div class="stat st-sure"><b>${s.sure}</b>/${s.total} 确答 ${s.sureWithKey?`（对分正确率 ${s.sureRight}/${s.sureWithKey}）`:""}</div>
+    <div class="stat st-lean"><b>${s.lean}</b> 倾向 ${s.leanWithKey?`（实测命中 ${s.leanRight}/${s.leanWithKey}）`:""}</div>
+    <div class="stat st-elim"><b>${s.elim}</b> 排除≥2 ${s.elimWithKey?`（正解存活 ${s.elimSaved}/${s.elimWithKey}）`:""}</div>
+    <div class="stat st-none"><b>${s.none + s.weak}</b> 无覆盖（含仅排1个：${s.weak}）</div></div>`;
+  let curDai = "";
+  for(const {sec, dai, type, q, r} of run.results){
+    if(dai !== curDai){ curDai = dai; html += `<div class="daihead">${esc(sec)} · ${esc(dai)} <span style="font-weight:400">(${type})</span></div>`; }
+    const tier = r.tier === "weak" ? "none" : r.tier;
+    const badge = tier==="sure" ? (q.answer && r.answer!==q.answer ? '<span class="badge b-wrong">确答·判错!</span>' : '<span class="badge b-sure">确答</span>')
+      : tier==="lean" ? '<span class="badge b-lean">倾向 '+r.pick+'（命中率'+r.hit+'）</span>'
+      : tier==="elim" ? '<span class="badge b-elim">排除'+(r.eliminated||[]).length+'</span>'
+      : '<span class="badge b-none">无覆盖</span>';
+    html += `<div class="qcard"><div class="qhead"><span class="qnum">題${q.num}</span>${badge}
+      ${r.rules && r.rules.length ? '<span style="font-size:12px;color:var(--muted)">规则: '+r.rules.join("・")+'</span>':''}
+      ${r.note ? '<span style="font-size:12px;color:var(--muted)">'+esc(r.note)+'</span>':''}</div>`;
+    if(q.stem) html += `<div class="qstem">${esc(q.stem)}</div>`;
+    html += '<div class="opts">' + q.options.map((o,i)=>{
+      const n1 = i+1;
+      const cls = ["opt"];
+      if(r.tier==="sure" && r.answer===n1) cls.push("picked");
+      if(r.tier==="lean" && r.pick===n1) cls.push("lean");
+      if(r.eliminated && r.eliminated.includes(n1)) cls.push("dead");
+      if(q.answer===n1) cls.push("key");
+      const sc = r.scores ? ` <span style="color:var(--muted);font-size:11px">重叠${r.scores[i]}</span>` : "";
+      return `<div class="${cls.join(' ')}">${n1}. ${esc(o)}${sc}</div>`;
+    }).join("") + '</div>';
+    const why = [];
+    if(r.details) r.details.forEach((d,i)=>{ if(d.known && d.g) why.push(`选项${i+1}「${esc(q.options[i]||"")}」= ${esc(d.g.pat)}（${esc(d.g.mean)}，前接${d.g.prev.join("/")}）${d.ok?"✓合法":"✗接续不合"}`); });
+    if(r.classes) why.unshift(`空格前形态判定: ${r.classes.join("/")}`);
+    if(r.loc && r.loc.found) why.push(`<b>🎯 锚点定位「${esc(r.loc.key)}」</b>（第${r.loc.idx+1}/${r.loc.total}句）→ <b>只读这${r.loc.window.length}句</b>：<br>${r.loc.window.map((x,i)=>(r.loc.lo+i===r.loc.idx?"<b style='color:var(--acc)'>▶ "+esc(x)+"</b>":"　"+esc(x))).join("<br>")}<br><i>${esc(r.loc.why)}</i>`);
+    if(r.loc && r.loc.found===false) why.push(`<b>锚点「${esc(r.loc.key)}」在文中未检索到</b>（可能是转写差异，需手动找）`);
+    if(r.claims && r.claims.length) why.push(`<b>主张句(读2):</b> ${esc(r.claims.join(" "))}`);
+    if(r.zone) why.push(`<b>决定段:</b> ${esc(r.zone)}…`);
+    if(r.tier==="info"){
+      if(r.facts && r.facts.length) why.push(`<b>题干条件:</b> ${esc(r.facts.join("　"))}`);
+      if(r.nums && r.nums.length) why.push(`<b>题干数值:</b> ${esc(r.nums.join("　"))}`);
+      why.push(`<b>套这4条规则:</b> 检1 上限/まで→超了就取上限　检2 以上/未満→边界值算哪边　检3 必ず=必需 vs 場合により=有条件　检4 〜以内 和 最終期限 取较早者`);
+      if(r.constraints) why.push(`<b>文中约束条款:</b><br>` + r.constraints.map(c=>"· "+esc(c)).join("<br>"));
+    }
+    if(why.length) html += `<div class="why">${why.join("<br>")}</div>`;
+    html += '</div>';
+  }
+  out.innerHTML = html;
+}
+</script>
+</body>
+</html>
