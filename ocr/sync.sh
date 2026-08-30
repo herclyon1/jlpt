@@ -1,11 +1,12 @@
 #!/bin/bash
-# 全自动: 拉取仓库 → OCR 新文件 → 提交推回
-# 设计为由 launchd 定时调用，也可手动执行一次: bash ocr/auto.sh
+# 一键同步: 拉取仓库 → OCR 新文件 → 提交推回
+# 手动执行: bash ocr/sync.sh
+# 你在手机上传文件到 exams/raw/ 之后，回到 Mac 跑这一条就行
 set -u
 REPO="/Users/herclyon/JLPT/repo"
 OCRBIN="/Users/herclyon/JLPT/ocr/pdfocr"
-LOG="/Users/herclyon/JLPT/ocr/auto.log"
-exec >> "$LOG" 2>&1
+LOG="/Users/herclyon/JLPT/ocr/sync.log"
+exec > >(tee -a "$LOG") 2>&1     # 同时打屏幕和日志，手动执行要看得见
 echo "===== $(date '+%F %T')"
 
 cd "$REPO" || { echo "仓库不存在: $REPO"; exit 1; }
@@ -47,9 +48,9 @@ git add -A exams/
 if git diff --cached --quiet; then echo "无变更"; exit 0; fi
 git commit -q -m "自动 OCR: 新增 ${new} 个文件的文字层
 
-由 ocr/auto.sh 定时任务生成。源文件 exams/raw/，输出 exams/ocr/"
+由 ocr/sync.sh 生成。源文件 exams/raw/，输出 exams/ocr/"
 if git push -q origin main; then
   echo "✅ 已推送 ${new} 个 OCR 结果"
 else
-  echo "⚠ 推送失败，下轮重试"
+  echo "⚠ 推送失败，请检查网络或冲突"
 fi

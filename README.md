@@ -68,7 +68,7 @@ mining/            统计挖掘的脚本与报告
 ### 加新卷子的流程
 
 1. 把 PDF 或图片传到 `exams/raw/`（手机 App 直接上传即可）
-2. `ocr/auto.sh` 定时任务自动 OCR，结果推回 `exams/ocr/`
+2. 回到 Mac 跑一条 `bash ocr/sync.sh`，自动 OCR 并推回 `exams/ocr/`
 3. 把 OCR 文本整理成 `FORMAT.md` 规定的标准格式，放进 `converted/`
 4. 跑 `solver/solve.py` 或用 `tools/JLPT判题机.html`
 
