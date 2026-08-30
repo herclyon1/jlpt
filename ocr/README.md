@@ -1,24 +1,54 @@
-# 本机 OCR（零 token、纯离线）
+# OCR 工具
 
-macOS 自带 Vision 文字识别引擎，日语准确率很高。已编译好命令行工具。
+macOS 自带 Vision 引擎，日语识别准确率高，**零 API 成本、纯离线**。支持 PDF 与图片（jpg/png/heic/tiff）。
+
+## 单文件
 
 ```bash
-# 全本
-./ocr/pdfocr "试卷.pdf" > 输出.txt
-
-# 只做第 8 到 12 页
-./ocr/pdfocr "试卷.pdf" 8 12 > 输出.txt
+./pdfocr "试卷.pdf" > 输出.txt       # 全本
+./pdfocr "试卷.pdf" 8 12 > 输出.txt  # 只做第 8-12 页
+./pdfocr "答案卡.jpg" > 输出.txt      # 图片
 ```
 
-实测速度：36 页试卷 **9.3 秒**，17 页听力原文 **5.2 秒**。完全本地，不联网，不消耗任何 API 额度。
+实测：36 页试卷 9.3 秒、45 页 5.2 万字全本一次跑完。
 
-输出格式：每页以 `=== PAGE n` 开头，正文按版面顺序（先按行的纵向位置、同行内按横向位置）排列。
+## 批处理
 
-## 已知的识别偏差（转成标准格式时要留意）
+```bash
+./batch.sh                     # 默认 ../exams/raw -> ../exams/ocr
+./batch.sh 输入目录 输出目录
+```
 
-- 选项编号的 `1` 偶尔被识成 `|` 或 `l`
+已处理过且源文件未更新的自动跳过。实测 10 个文件 58 秒全部成功。
+
+## 全自动
+
+**把 PDF/图片传到仓库的 `exams/raw/`，其余不用管。**
+
+`auto.sh` 会：拉取仓库 → OCR 新文件 → 提交推回 `exams/ocr/`。
+
+先手动跑一次确认正常：
+```bash
+bash ocr/auto.sh && tail -20 ocr/auto.log
+```
+
+装成每 10 分钟自动执行（这条命令会在你的账户下注册一个后台定时任务，请自行确认后执行）：
+```bash
+cp ocr/com.herclyon.jlpt-ocr.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.herclyon.jlpt-ocr.plist
+```
+
+查看日志：`tail -f ocr/auto.log`
+
+随时停止并卸载：
+```bash
+launchctl unload ~/Library/LaunchAgents/com.herclyon.jlpt-ocr.plist && rm ~/Library/LaunchAgents/com.herclyon.jlpt-ocr.plist
+```
+
+## 已知识别偏差（转标准格式时留意）
+
+- 选项编号 `1` 偶尔识成 `|` 或 `l`
 - `N1` 有时识成 `NI`
-- **双栏排版的选项会按视觉行序输出**，即 1→3→2→4，需要按语义重排
-- 汉字异体（押さえる/抑える）按印刷原样输出，不做归一
+- **双栏排版的选项按视觉行序输出（1→3→2→4），需按语义重排**
+- 汉字异体按印刷原样输出，不做归一
 
-重新编译：`swiftc -O -o ocr/pdfocr ocr/pdfocr.swift`
+重新编译：`swiftc -O -o pdfocr pdfocr.swift`

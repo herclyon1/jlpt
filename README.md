@@ -43,9 +43,9 @@
 
 ### 工具
 
-- **[JLPT判题机.html](JLPT判题机.html)** — 单文件离线判题机，粘贴卷面即出四档判定
-- **[N1文法速判训练器.html](N1文法速判训练器.html)** — 两段式限时速判训练，715 题覆盖 222 条句型
-- **[规则卡片.md](规则卡片.md)** — 供人记忆的 10 条规则，每条附实测数据
+- **[JLPT判题机.html](tools/JLPT判题机.html)** — 单文件离线判题机，粘贴卷面即出四档判定
+- **[N1文法速判训练器.html](tools/N1文法速判训练器.html)** — 两段式限时速判训练，715 题覆盖 222 条句型
+- **[规则卡片.md](tools/规则卡片.md)** — 供人记忆的 10 条规则，每条附实测数据
 - **[ocr/](ocr/)** — macOS 原生 OCR 工具，36 页试卷 9.3 秒，零 API 成本
 
 两个 HTML 均为单文件、纯离线、双击即用。
@@ -53,14 +53,26 @@
 ### 目录
 
 ```
-FINDINGS.md      完整研究记录（含 20+ 条假设的证伪清单）
-FORMAT.md        标准卷面格式规范
-规则卡片.md       给人背的规则
-engine/          判题引擎源码 + 句型表 + 汉字音训表
-converted/       6 套真题的标准格式转写
-mining/          四路统计挖掘的脚本与报告
-ocr/             OCR 工具
+FINDINGS.md        完整研究记录（含 20+ 条假设的证伪清单）
+FORMAT.md          标准卷面格式规范
+exams/raw/         真题原件（PDF/图片）← 新卷子传这里
+exams/ocr/         OCR 自动输出的文字层
+converted/         标准格式转写（判题器的输入）
+tools/             成品工具：判题机、速判训练器、规则卡片
+ocr/               OCR 工具 + 批处理 + 全自动脚本
+engine/            规则引擎源码 + 句型表 + 汉字音训表
+solver/            全栈判题器（规则 + BERT + 句子嵌入）
+mining/            统计挖掘的脚本与报告
 ```
+
+### 加新卷子的流程
+
+1. 把 PDF 或图片传到 `exams/raw/`（手机 App 直接上传即可）
+2. `ocr/auto.sh` 定时任务自动 OCR，结果推回 `exams/ocr/`
+3. 把 OCR 文本整理成 `FORMAT.md` 规定的标准格式，放进 `converted/`
+4. 跑 `solver/solve.py` 或用 `tools/JLPT判题机.html`
+
+详见 [ocr/README.md](ocr/README.md)。
 
 ## 版权
 
