@@ -47,21 +47,29 @@ def load_asr(tag):
     return out
 
 def load_questions(tag):
-    """返回 [(大題, 題号, 台本开头120字)]"""
+    """返回 [(大題, 題号, 台本开头120字)]
+
+    兼容两种排版：#文 在 #題 之后（块内），或 #文 在前、#題 用 @文 引用。
+    """
     p = f'{ROOT}/converted/{tag}_聴解.txt'
     if not os.path.exists(p):
         return []
+    raw = open(p, encoding='utf-8').read()
+    # 先建全局 passage 表
+    pas = {m.group(1): m.group(2) for m in
+           re.finditer(r'^#文 (\S+)\n(.*?)^#文完', raw, re.M | re.S)}
     qs = []
     dai = None
-    for b in re.split(r'^(?=#題 |#大題 )', open(p, encoding='utf-8').read(), flags=re.M):
+    for b in re.split(r'^(?=#題 |#大題 )', raw, flags=re.M):
         md = re.match(r'^#大題 問題(\d+)', b)
         if md:
             dai = int(md.group(1)); continue
-        mq = re.match(r'^#題 (\S+)', b)
+        mq = re.match(r'^#題 (\S+)(?:\s*[@＠]文\s*(\S+))?', b)
         if not mq:
             continue
         m = re.search(r'^#文 \S+\n(.*?)^#文完', b, re.M | re.S)
-        head = norm(re.sub(r'^[男女M F][12]?[：:]', '', (m.group(1) if m else ''), flags=re.M))[:120]
+        body = m.group(1) if m else pas.get(mq.group(2) or '', '')
+        head = norm(re.sub(r'^[男女M F][12]?[：:]', '', body, flags=re.M))[:120]
         qs.append((dai, mq.group(1), head))
     return qs
 
@@ -121,14 +129,20 @@ def segment(tag, cut=False):
         if not src:
             print(f'  {tag}: 找不到音频'); return segs
         env = dict(os.environ, PATH=os.path.expanduser('~/homebrew/bin') + ':' + os.environ['PATH'])
+        # 有的源音频流是 AAC（且带 h264 封面流），copy 进 mp3 容器会失败 → 改为转码
+        codec = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'a:0',
+                                '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', src[0]],
+                               capture_output=True, text=True, env=env).stdout.strip()
+        acodec = ['-c:a', 'copy'] if codec == 'mp3' else ['-c:a', 'libmp3lame', '-b:a', '96k']
         n_ok = 0
         for s in segs:
             if s['start'] is None:
                 continue
             dst = f"{outdir}/Q{s['dai']}-{s['q']}.mp3"
             subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', str(s['start']),
-                            '-to', str(s['end']), '-i', src[0], '-c', 'copy', dst], env=env)
-            n_ok += os.path.exists(dst)
+                            '-to', str(s['end']), '-i', src[0],
+                            '-map', '0:a:0', '-vn'] + acodec + [dst], env=env)
+            n_ok += os.path.exists(dst) and os.path.getsize(dst) > 1000
         print(f'  切出 {n_ok} 个片段 → {outdir}/')
     return segs
 

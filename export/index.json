@@ -13,7 +13,7 @@
   "session": "2021-07",
   "questions": 104,
   "answers": 104,
-  "audio_clips": 0,
+  "audio_clips": 35,
   "passages": 48,
   "sections": [
    "言語知識",
@@ -25,7 +25,7 @@
   "session": "2021-12",
   "questions": 104,
   "answers": 104,
-  "audio_clips": 0,
+  "audio_clips": 35,
   "passages": 47,
   "sections": [
    "言語知識",
@@ -37,7 +37,7 @@
   "session": "2022-07",
   "questions": 103,
   "answers": 103,
-  "audio_clips": 0,
+  "audio_clips": 35,
   "passages": 47,
   "sections": [
    "言語知識",
@@ -49,7 +49,7 @@
   "session": "2022-12",
   "questions": 96,
   "answers": 96,
-  "audio_clips": 0,
+  "audio_clips": 30,
   "passages": 43,
   "sections": [
    "言語知識",
@@ -61,7 +61,7 @@
   "session": "2023-07",
   "questions": 96,
   "answers": 96,
-  "audio_clips": 0,
+  "audio_clips": 30,
   "passages": 44,
   "sections": [
    "言語知識",
@@ -73,7 +73,7 @@
   "session": "2023-12",
   "questions": 96,
   "answers": 96,
-  "audio_clips": 0,
+  "audio_clips": 30,
   "passages": 44,
   "sections": [
    "言語知識",
@@ -85,7 +85,7 @@
   "session": "2024-07",
   "questions": 96,
   "answers": 96,
-  "audio_clips": 0,
+  "audio_clips": 30,
   "passages": 43,
   "sections": [
    "言語知識",
@@ -98,7 +98,7 @@
   "questions": 96,
   "answers": 96,
   "audio_clips": 0,
-  "passages": 43,
+  "passages": 44,
   "sections": [
    "言語知識",
    "読解",
@@ -109,8 +109,8 @@
   "session": "2025-07",
   "questions": 96,
   "answers": 96,
-  "audio_clips": 0,
-  "passages": 41,
+  "audio_clips": 30,
+  "passages": 43,
   "sections": [
    "言語知識",
    "読解",
@@ -133,7 +133,7 @@
   "session": "2026-07",
   "questions": 96,
   "answers": 96,
-  "audio_clips": 0,
+  "audio_clips": 30,
   "passages": 42,
   "sections": [
    "言語知識",
