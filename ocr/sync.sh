@@ -26,10 +26,13 @@ git stash pop -q 2>/dev/null
 mkdir -p exams/raw exams/ocr
 new=0
 while IFS= read -r -d '' f; do
+  rel="${f#exams/raw/}"; sub="$(dirname "$rel")"
   stem="$(basename "$f")"; stem="${stem%.*}"
-  dst="exams/ocr/$stem.txt"
+  [ "$sub" = "." ] && sub="待分类"      # 传到根目录的自动归入待分类
+  mkdir -p "exams/ocr/$sub"
+  dst="exams/ocr/$sub/$stem.txt"
   if [ -f "$dst" ] && [ "$dst" -nt "$f" ]; then continue; fi
-  printf '  OCR %s ... ' "$(basename "$f")"
+  printf '  OCR %s ... ' "$rel"
   if "$OCRBIN" "$f" > "$dst.tmp" 2>/dev/null && [ -s "$dst.tmp" ]; then
     mv "$dst.tmp" "$dst"
     echo "$(grep -c '^=== PAGE' "$dst")页 $(wc -m < "$dst" | tr -d ' ')字"

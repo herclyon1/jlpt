@@ -14,12 +14,15 @@ mkdir -p "$OUT"
 
 n=0; skip=0; fail=0; t0=$(date +%s)
 while IFS= read -r -d '' f; do
+  rel="${f#$IN/}"; sub="$(dirname "$rel")"
   base="$(basename "$f")"; stem="${base%.*}"
-  dst="$OUT/$stem.txt"
+  [ "$sub" = "." ] || mkdir -p "$OUT/$sub"
+  dst="$OUT/${sub#.}${sub:+/}$stem.txt"; dst="${dst#/}"
+  [ "$sub" = "." ] && dst="$OUT/$stem.txt"
   if [ -f "$dst" ] && [ "$dst" -nt "$f" ]; then
     skip=$((skip+1)); continue
   fi
-  printf '  处理 %s ... ' "$base"
+  printf '  处理 %s ... ' "$rel"
   if "$BIN" "$f" > "$dst.tmp" 2>/dev/null && [ -s "$dst.tmp" ]; then
     mv "$dst.tmp" "$dst"
     pages=$(grep -c '^=== PAGE' "$dst"); chars=$(wc -m < "$dst" | tr -d ' ')
