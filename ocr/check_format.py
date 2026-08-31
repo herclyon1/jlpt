@@ -4,7 +4,7 @@ import re,sys,collections
 EXPECT={'言語知識':{1:6,2:7,3:6,4:6,5:10,6:5,7:4},
         '読解':{8:4,9:8,10:3,11:2,12:3,13:2},
         '聴解':{1:5,2:6,3:5,4:11,5:3}}
-def check(fp):
+def check(fp,need_ans=True,loose=False):
     sec=None;dai=None;qs=[];cur=None;pas=set();ref=set();err=[];ln=0
     inpas=False
     for line in open(fp,encoding='utf-8'):
@@ -28,7 +28,9 @@ def check(fp):
             if not pm: err.append(f"L{ln}: #題 格式错: {v!r}"); continue
             cur={'num':int(pm.group(1)),'dai':dai,'opts':0,'ans':None,'ln':ln,'ref':pm.group(2)}
             qs.append(cur)
-            if pm.group(2): ref.add(pm.group(2))
+            if pm.group(2):
+                for r in re.split(r'[,，、]',pm.group(2)):
+                    if r.strip(): ref.add(r.strip())
         elif t=='选':
             if not cur: err.append(f"L{ln}: #选 出现在 #題 之前")
             else:
@@ -46,7 +48,9 @@ def check(fp):
     byd=collections.Counter(q['dai'] for q in qs)
     exp=EXPECT.get(sec,{})
     print(f"\n{'大題':<6}{'实际':>5}{'应有':>5}   状态")
-    for d in sorted(set(byd)|set(exp)):
+    allk=[d for d in set(byd)|set(exp) if d is not None]
+    if None in byd: err.append(f"有 {byd[None]} 题出现在 #大題 之前(缺大題标记)")
+    for d in sorted(allk):
         a=byd.get(d,0); e=exp.get(d,'?')
         st='✅' if e=='?' or a==e else ('⚠少'+str(e-a) if isinstance(e,int) and a<e else '⚠多')
         print(f"問題{d:<4}{a:>5}{str(e):>5}   {st}")
@@ -59,8 +63,27 @@ def check(fp):
     if err:
         print(f"\n格式错误 {len(err)} 处:")
         for e in err[:15]: print("  "+e)
-    ok = not err and not noopt and not noans and not bad
+    cnt_err=[]
+    if not loose:
+        for d,e in exp.items():
+            a=byd.get(d,0)
+            if a!=e: cnt_err.append(f"問題{d}: 实际{a}题, 应有{e}题")
+    else:
+        bydai_nums=collections.defaultdict(list)
+        for q in qs: bydai_nums[q['dai']].append(q['num'])
+        for d,ns in bydai_nums.items():
+            u=sorted(set(ns))
+            if u!=list(range(u[0],u[0]+len(u))):
+                cnt_err.append(f"問題{d} 題号不连续: {ns}")
+    if not qs: cnt_err.append("文件里一道题都没有")
+    if sec not in EXPECT: cnt_err.append(f"#科 缺失或不认识: {sec!r}")
+    if cnt_err:
+        print(f"\n题数不符 {len(cnt_err)} 处:")
+        for e in cnt_err: print("  "+e)
+    ok = not err and not noopt and not bad and not cnt_err and (not noans or not need_ans)
     print("\n"+("✅ 通过" if ok else "❌ 不通过——把上面的报错贴回给 DeepSeek 让它修"))
     return ok
 if __name__=='__main__':
-    sys.exit(0 if all(check(f) for f in sys.argv[1:]) else 1)
+    args=[a for a in sys.argv[1:] if not a.startswith('--')]
+    need=('--noans' not in sys.argv); loose=('--loose' in sys.argv)
+    sys.exit(0 if all(check(f,need,loose) for f in args) else 1)

@@ -13,7 +13,7 @@ import os,sys,re,json,glob,time,subprocess,urllib.request
 
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 API="https://api.deepseek.com/chat/completions"
-MODEL=os.environ.get("DEEPSEEK_MODEL","deepseek-chat")
+MODEL=os.environ.get("DEEPSEEK_MODEL","deepseek-v4-flash")
 
 def key():
     k=os.environ.get("DEEPSEEK_API_KEY")
@@ -22,9 +22,10 @@ def key():
     if os.path.exists(p): return open(p).read().strip()
     sys.exit("缺少 API key: export DEEPSEEK_API_KEY=sk-xxx  或写入 ocr/.ds_key")
 
-def call(msgs,max_tokens=8192,temp=0.0):
-    body=json.dumps({"model":MODEL,"messages":msgs,"temperature":temp,
-                     "max_tokens":max_tokens,"stream":False}).encode()
+def call(msgs,max_tokens=16384,temp=0.0,model=None):
+    body=json.dumps({"model":model or MODEL,"messages":msgs,"temperature":temp,
+                     "max_tokens":max_tokens,"stream":False,
+                     "reasoning_effort":"none"}).encode()   # v4 是推理模型, 不关会把token全烧在思维链上
     req=urllib.request.Request(API,data=body,headers={
         "Content-Type":"application/json","Authorization":"Bearer "+key()})
     for attempt in range(4):
@@ -83,8 +84,26 @@ RULES={
 }
 COMMON="""你是日语试卷格式转换员。把下面的 OCR 文本转成指定的标记格式。
 
-【格式】行首 # 是标记行:
+【格式】严格按下面的示例, 一个字符都不能变。注意 #选 后面必须跟选项编号和空格。
+
+完整示例(照抄这个结构):
 #卷 {exam} N1
+#科 言語知識
+#大題 問題1
+#題 1
+#干 事件の＜真相＞を究明する。
+#选 1 しんそう
+#选 2 しんしょう
+#选 3 まそう
+#选 4 まっそう
+#答 1
+#題 2
+#干 ...
+#选 1 ...
+
+标记只有这几个, 不要自创: #卷 #科 #大題 #題 #干 #选 #答 #文 #文完
+禁止写成 #問1 / #選 / #题 / #答:2 这类变体。
+
 {rules}
 
 【答案】OCR 文本末尾有答案表, 格式如「問題8 / 45番 46番 47番 48番 / 1 3 2 2」,
@@ -93,6 +112,51 @@ COMMON="""你是日语试卷格式转换员。把下面的 OCR 文本转成指�
 【保真】日文逐字保真。OCR 有丢字(如「潜している」实为「潜伏している」、
 「らかな声」实为「朗らかな声」), 你能确认的补全, 不确认的原样保留并在行末加 〔?〕。
 """
+
+NORM_RULES=[
+ (r'^#\s*問\s*題?\s*(\d+)\s*$', r'#大題 問題\1'),      # #問1 / #問題1 → #大題 問題1
+ (r'^#\s*大\s*題\s*問?題?\s*(\d+)', r'#大題 問題\1'),
+ (r'^#\s*選\s', '#选 '), (r'^#\s*选\s', '#选 '),
+ (r'^#\s*题\s', '#題 '), (r'^#\s*幹\s', '#干 '),
+ (r'^#\s*答案?\s*[:：]?\s*', '#答 '),
+]
+def normalize(txt):
+    """把模型常见的格式变体纠正成标准格式"""
+    out=[]; optn=0; dai=None; seen_dai=False
+    for raw in txt.split('\n'):
+        l=raw.rstrip()
+        for pat,rep in NORM_RULES:
+            l2=re.sub(pat,rep,l)
+            if l2!=l: l=l2; break
+        if l.startswith('#大題'): seen_dai=True; optn=0
+        elif l.startswith('#題'): optn=0
+            # 没有 #大題 就按题号推断
+        elif l.startswith('#选'):
+            m=re.match(r'^#选\s+(\d)\s+(.*)$',l)
+            if m: optn=int(m.group(1))
+            else:                                   # 漏了编号 → 按顺序补
+                body=re.sub(r'^#选\s*','',l).strip()
+                optn+=1; l=f'#选 {optn} {body}'
+        out.append(l)
+    txt='\n'.join(out)
+    # 补 #大題: 按题号区间推断
+    if not seen_dai:
+        RANGE=[(1,6,1),(7,13,2),(14,19,3),(20,25,4),(26,35,5),(36,40,6),(41,45,7),
+               (45,48,8),(49,56,9),(57,59,10),(60,61,11),(62,64,12),(65,66,13)]
+        res=[];cur=None
+        for l in txt.split('\n'):
+            m=re.match(r'^#題 (\d+)',l)
+            if m:
+                n=int(m.group(1))
+                d=next((d for a,b,d in RANGE if a<=n<=b),None)
+                if d and d!=cur: res.append(f'#大題 問題{d}'); cur=d
+            res.append(l)
+        txt='\n'.join(res)
+    # 删掉引用了不存在文章块的 @文
+    pas=set(re.findall(r'^#文 (\S+)',txt,re.M))
+    txt=re.sub(r'(^#題 \d+)\s*[@＠]文\s*(\S+)',
+               lambda m: m.group(1) if m.group(2) not in pas else m.group(0), txt, flags=re.M)
+    return txt
 
 def pick_files(sess):
     d=os.path.join(ROOT,'exams','ocr',sess)
@@ -107,7 +171,7 @@ def pick_files(sess):
     if paper is None and fs: paper=sorted(fs,key=lambda x:-os.path.getsize(x))[0]
     return paper,script
 
-def convert(sess,sec,maxround=3):
+def convert(sess,sec,maxround=3,model=None):
     paper,script=pick_files(sess)
     if not paper: print(f"  {sess}: 找不到 OCR 文件"); return False
     src=open(paper,encoding='utf-8',errors='ignore').read()
@@ -119,9 +183,11 @@ def convert(sess,sec,maxround=3):
     sysmsg=COMMON.format(exam=sess,rules=RULES[sec])
     msgs=[{"role":"system","content":sysmsg},{"role":"user","content":"【OCR 文本】\n"+src}]
     out=os.path.join(ROOT,'converted',f'{sess}_{sec}.txt')
+    if model and model!=MODEL: out=os.path.join(ROOT,'converted',f'{sess}_{sec}.{model}.txt')
     for rd in range(maxround):
-        t0=time.time(); txt,usage=call(msgs)
+        t0=time.time(); txt,usage=call(msgs,model=model)
         txt=re.sub(r'^```[a-z]*\n?|```$','',txt.strip(),flags=re.M)
+        txt=normalize(txt)
         os.makedirs(os.path.dirname(out),exist_ok=True)
         open(out,'w',encoding='utf-8').write(txt if txt.endswith('\n') else txt+'\n')
         r=subprocess.run([sys.executable,os.path.join(ROOT,'ocr','check_format.py'),out],
