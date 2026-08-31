@@ -7,7 +7,7 @@ ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # JLPT 换算: 言語知識+読解 各占 60 分(合计120)，聴解 60 分。按题数线性折算。
 SCALE={'言語知識':60,'読解':60,'聴解':60}
 sess=sorted({os.path.basename(f).rsplit('_',1)[0] for f in glob.glob(f'{ROOT}/converted/*.txt')})
-G=collections.defaultdict(lambda:[0,0,0]); ROUTE=collections.defaultdict(lambda:[0,0])
+G=collections.defaultdict(lambda:[0,0,0,0.0]); ROUTE=collections.defaultdict(lambda:[0,0])
 rows=[]
 for s in sess:
     per={}
@@ -22,7 +22,8 @@ for s in sess:
                 g[1]+=1; ok=bool(q['ans'] and pick==q['ans'])
                 g[0]+=ok; exp+=ok
                 r=ROUTE[meth or '?']; r[1]+=1; r[0]+=ok
-            else: exp+=0.25
+            else:
+                gv=1.0/max(2,len(q['opts'])); exp+=gv; g[3]+=gv
         per[sec]=(exp,n)
         print(f"  {s}_{sec}: {exp:.1f}/{n}",flush=True)
     rows.append((s,per))
@@ -41,7 +42,9 @@ for s,per in rows:
 print(f"\n{'科目|大題':<26}{'出手':>9}{'正确率':>9}   期望分")
 T=[0.0,0]
 for k in sorted(G):
-    a,f,n=G[k]; exp=a+(n-f)*0.25; T[0]+=exp; T[1]+=n
+    a,f,n,gb=G[k]
+    exp=a+gb                       # 未出手按各题实际选项数的蒙题期望
+    T[0]+=exp; T[1]+=n
     print(f"{k:<26}{f}/{n:<5}{100*a/f if f else 0:>7.1f}%   {exp:>6.1f}/{n}")
 print(f"{'合计':<26}{'':>9}{'':>9}   {T[0]:.1f}/{T[1]} = {100*T[0]/T[1]:.1f}%")
 print(f"\n{'路线':<24}{'出手':>7}{'正确':>7}{'正确率':>9}{'比蒙多拿':>10}")

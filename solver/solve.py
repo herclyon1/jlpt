@@ -160,7 +160,7 @@ def run(fp):
             elif d==4: pick,meth=solve_usage(q)
             elif d==6: pick,meth=solve_star(q)
         elif '読解' in s:
-            if d==13: pick,meth=solve_info(q,pas)
+            if d==13: pick,meth=None,'情報検索-无有效方法'   # 全库22题实测22.7%, 低于蒙题基线, 弃权
             elif d==8: pick,meth=None,'短文-无有效方法'   # 实测16.7%, 低于基线, 主动弃权
             else: pick,meth=solve_reading(q,pas)
         elif '聴解' in s:
