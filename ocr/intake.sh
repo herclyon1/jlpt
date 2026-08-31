@@ -44,6 +44,11 @@ guess_session() {   # 从文件名猜场次
   fi
 }
 
+# 一次性建好已有文件的哈希集合（避免 O(n^2) 重复扫描）
+HASHES="$(mktemp)"
+find exams/raw -type f ! -name '.gitkeep' ! -name 'README.md' -print0 2>/dev/null \
+  | xargs -0 -r shasum -a 256 2>/dev/null | cut -c1-16 | sort -u > "$HASHES"
+
 moved=0; dup=0
 while IFS= read -r -d '' f; do
   base="$(basename "$f")"
@@ -55,16 +60,18 @@ while IFS= read -r -d '' f; do
   mkdir -p "exams/raw/$sess"
   h="$(shasum -a 256 "$f" | cut -c1-16)"
   # 内容去重: 仓库里已有相同哈希的就跳过
-  if find exams/raw -type f ! -name '.gitkeep' -print0 2>/dev/null \
-     | xargs -0 -I{} shasum -a 256 {} 2>/dev/null | cut -c1-16 | grep -qx "$h"; then
+  if grep -qx "$h" "$HASHES"; then
     echo "  跳过(内容重复) $base"; dup=$((dup+1)); continue
   fi
+  echo "$h" >> "$HASHES"
   dst="exams/raw/$sess/$base"
   [ -e "$dst" ] && dst="exams/raw/$sess/${base%.*}_$h.${base##*.}"
   cp "$f" "$dst" && { echo "  → $sess/  $base"; moved=$((moved+1)); }
 done < <(find "$SRC" -type f \( -iname '*.pdf' -o -iname '*.jpg' -o -iname '*.jpeg' \
-         -o -iname '*.png' -o -iname '*.tif' -o -iname '*.tiff' -o -iname '*.heic' \) -print0 2>/dev/null)
+         -o -iname '*.png' -o -iname '*.tif' -o -iname '*.tiff' -o -iname '*.heic' \) \
+         ! -iname '*译文*' -print0 2>/dev/null)
 
+rm -f "$HASHES"
 [ -n "${TMPX:-}" ] && rm -rf "$TMPX"
 echo "收取完成: 新增 $moved 个, 内容重复跳过 $dup 个"
 [ "$moved" -eq 0 ] && exit 0

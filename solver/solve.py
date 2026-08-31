@@ -113,7 +113,7 @@ def solve_star(q):
              key=lambda pm: pll(pre+''.join(q['opts'][i] for i in pm)+post))
     return best[star]+1,'BERT-排列'
 def solve_reading(q,pas):
-    if not q['pas'] or q['pas'] not in pas: return None,None
+    if not q['pas'] or q['pas'] not in pas or len(q['opts'])<2: return None,None
     s=sents(pas[q['pas']])
     if len(s)<3: return None,'短文-规则不适用'
     sb=sbert()
@@ -121,19 +121,19 @@ def solve_reading(q,pas):
     O=sb.encode(q['opts'],convert_to_numpy=True,normalize_embeddings=True,show_progress_bar=False)
     return int(np.argmax((O@E.T).max(1)))+1,'句子嵌入'
 def solve_lis_lean(q,pas):
-    if not q['pas'] or q['pas'] not in pas: return None,None
+    if not q['pas'] or q['pas'] not in pas or len(q['opts'])<2: return None,None
     st=toks(pas[q['pas']])
     if len(st)<5: return None,None
     sc=[len(toks(o)&st)/max(min(len(toks(o)),len(st)),1) for o in q['opts']]
     return int(np.argmin(sc))+1,'听A-最少重叠'
 def solve_lis_quick(q,pas):
-    if not q['pas'] or q['pas'] not in pas: return None,None
+    if not q['pas'] or q['pas'] not in pas or len(q['opts'])<2: return None,None
     sc=pas[q['pas']].replace('\n','')[-60:]
     v=[pll(sc+o) for o in q['opts']]
     return int(np.argmax(v))+1,'BERT-PLL'
 
 def solve_info(q,pas):
-    if not q['pas'] or q['pas'] not in pas: return None,None
+    if not q['pas'] or q['pas'] not in pas or len(q['opts'])<2: return None,None
     s=[x for x in sents(pas[q['pas']]) if re.search(r'(上限|まで|以内|以上|以下|未満|必ず|ただし|のみ|無料|割引|不要|円|日|時)',x)]
     if len(s)<2: return None,None
     sb=sbert()
@@ -148,6 +148,7 @@ def run(fp):
     qs,pas=parse(fp)
     out=[]
     for q in qs:
+        if len(q['opts'])<2: out.append((q,None,'选项缺失')); continue
         d=dai_no(q['dai']); s=q['sec'] or ''
         pick=meth=None
         if '言語知識' in s:
