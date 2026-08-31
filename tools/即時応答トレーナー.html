@@ -1,0 +1,168 @@
+<meta charset="utf-8">
+<title>N1 即時応答トレーナー</title>
+<style>
+  :root{
+    --bg:#faf9f7; --fg:#1a1a1a; --dim:#6b6b6b; --line:#e2e0dc;
+    --card:#fff; --ok:#1a7f4b; --ng:#b3261e; --accent:#2b5c9b;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#16181c;--fg:#e8e6e3;--dim:#9a9894;--line:#2e3238;
+          --card:#1e2126;--ok:#4ade80;--ng:#f87171;--accent:#7aa7e0;}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:16px;background:var(--bg);color:var(--fg);
+       font:16px/1.7 "Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+       max-width:680px;margin-inline:auto}
+  h1{font-size:19px;margin:0 0 4px}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:16px}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  button{font:inherit;padding:7px 14px;border:1px solid var(--line);border-radius:8px;
+         background:var(--card);color:var(--fg);cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+        padding:18px;margin-bottom:12px}
+  .stim{font-size:19px;line-height:1.8;margin:10px 0 4px}
+  .hidden{filter:blur(7px);user-select:none}
+  .opt{display:block;width:100%;text-align:left;margin:7px 0;padding:11px 14px;
+       font-size:16px;line-height:1.6}
+  .opt.ok{background:color-mix(in srgb,var(--ok) 15%,transparent);border-color:var(--ok)}
+  .opt.ng{background:color-mix(in srgb,var(--ng) 15%,transparent);border-color:var(--ng)}
+  .meta{color:var(--dim);font-size:12px;display:flex;justify-content:space-between;
+        border-top:1px solid var(--line);padding-top:10px;margin-top:14px}
+  .stat{font-variant-numeric:tabular-nums}
+  audio{width:100%;margin:10px 0}
+  .warn{color:var(--ng);font-size:13px}
+  kbd{border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:12px;
+      background:var(--bg)}
+</style>
+
+<h1>N1 即時応答トレーナー</h1>
+<div class="sub">
+  <b id="total">…</b> 道真题。<b>它不是听力理解题，是极短刺激下的单点识别题</b>——
+  刺激句中位 32 字符（問題1/2 的台本平均 396/425 字符）。
+  练的是：听出说话人的<b>态度</b>（抱怨／请求／夸奖／惊讶／自嘲），选态度匹配的应答。
+</div>
+
+<div class="bar">
+  <button id="mode" class="primary">考试模式（不看文字）</button>
+  <button id="replay">重听 <kbd>R</kbd></button>
+  <button id="skip">跳过</button>
+  <span class="stat" id="stat"></span>
+</div>
+
+<div class="card">
+  <div id="audiowrap"></div>
+  <div class="stim" id="stim"></div>
+  <div id="opts"></div>
+  <div class="meta">
+    <span id="src"></span><span id="timer"></span>
+  </div>
+</div>
+
+<div class="card" id="review" style="display:none">
+  <div style="font-size:13px;color:var(--dim);margin-bottom:6px">错题回顾</div>
+  <div id="wrong"></div>
+</div>
+
+<script>
+const DATA_URL = '../export/drill_soku.json';
+const AUDIO_BASE = '../audio_clips/';
+let items = [], queue = [], cur = null, examMode = true, t0 = 0;
+let done = 0, right = 0, wrongList = [];
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+function render(){
+  if(!cur){document.getElementById('stim').textContent='全部做完了。';
+           document.getElementById('opts').innerHTML='';return;}
+  const aw = document.getElementById('audiowrap');
+  aw.innerHTML = cur.audio
+    ? `<audio id="au" controls autoplay src="${AUDIO_BASE}${cur.audio}"></audio>`
+    : `<div class="warn">这一题没有音频（该场次未收录），按文字练习</div>`;
+  const st = document.getElementById('stim');
+  st.textContent = cur.stimulus;
+  st.className = 'stim' + (examMode && cur.audio ? ' hidden' : '');
+  const box = document.getElementById('opts');
+  box.innerHTML = '';
+  cur.options.forEach((o,i)=>{
+    const b=document.createElement('button');
+    b.className='opt'+(examMode&&cur.audio?' hidden':'');
+    b.textContent=(i+1)+'　'+o;
+    b.onclick=()=>answer(i+1,b);
+    box.appendChild(b);
+  });
+  document.getElementById('src').textContent = cur.session + ' 問題4 ' + cur.no + '番';
+  t0 = Date.now();
+  tick();
+}
+
+function answer(pick, btn){
+  if(btn.dataset.done) return;
+  const secs = ((Date.now()-t0)/1000).toFixed(1);
+  [...document.querySelectorAll('.opt')].forEach((b,i)=>{
+    b.classList.remove('hidden'); b.dataset.done=1;
+    if(i+1===cur.answer) b.classList.add('ok');
+    else if(i+1===pick) b.classList.add('ng');
+  });
+  document.getElementById('stim').classList.remove('hidden');
+  done++;
+  if(pick===cur.answer) right++;
+  else { wrongList.push({...cur, picked:pick, secs});
+         queue.push(cur); }          // 答错的重新入队
+  stat();
+  showWrong();
+  setTimeout(next, pick===cur.answer ? 900 : 2600);
+}
+
+function next(){ cur = queue.shift() || null; render(); }
+function stat(){
+  document.getElementById('stat').textContent =
+    `${done} 题 · 正确 ${right} (${done?Math.round(right/done*100):0}%) · 剩 ${queue.length}`;
+}
+function tick(){
+  if(!cur) return;
+  document.getElementById('timer').textContent = ((Date.now()-t0)/1000).toFixed(1)+' 秒';
+  requestAnimationFrame(tick);
+}
+function showWrong(){
+  if(!wrongList.length) return;
+  document.getElementById('review').style.display='';
+  document.getElementById('wrong').innerHTML = wrongList.slice(-6).reverse().map(w=>
+    `<div style="margin:10px 0;padding-bottom:10px;border-bottom:1px solid var(--line)">
+       <div style="font-size:15px">${w.stimulus}</div>
+       <div style="font-size:13px;color:var(--dim);margin-top:4px">
+         你选 ${w.picked}　正解 <b>${w.answer}</b>：${w.options[w.answer-1]}
+       </div></div>`).join('');
+}
+
+document.getElementById('mode').onclick = e=>{
+  examMode = !examMode;
+  e.target.textContent = examMode ? '考试模式（不看文字）' : '学习模式（显示文字）';
+  e.target.className = examMode ? 'primary' : '';
+  document.getElementById('stim').classList.toggle('hidden', examMode && cur && cur.audio);
+  [...document.querySelectorAll('.opt')].forEach(b=>{
+    if(!b.dataset.done) b.classList.toggle('hidden', examMode && cur && cur.audio);
+  });
+};
+document.getElementById('replay').onclick = ()=>{
+  const a=document.getElementById('au'); if(a){a.currentTime=0;a.play();}
+};
+document.getElementById('skip').onclick = ()=>{ queue.push(cur); next(); };
+addEventListener('keydown', e=>{
+  if(e.key==='r'||e.key==='R') document.getElementById('replay').click();
+  if(['1','2','3'].includes(e.key)){
+    const b=document.querySelectorAll('.opt')[+e.key-1]; if(b) b.click();
+  }
+});
+
+fetch(DATA_URL).then(r=>r.json()).then(d=>{
+  items = d; queue = shuffle([...d]); document.getElementById('total').textContent=d.length; stat(); next();
+}).catch(()=>{
+  document.getElementById('stim').innerHTML =
+    '<span class="warn">读不到 ../export/drill_soku.json。<br>'+
+    '请从仓库根目录起一个本地服务再打开，例如：<br>'+
+    '<code>python3 -m http.server 8000</code> 然后访问 '+
+    '<code>localhost:8000/tools/即時応答トレーナー.html</code></span>';
+});
+</script>
