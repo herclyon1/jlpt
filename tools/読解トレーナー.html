@@ -1,0 +1,156 @@
+<meta charset="utf-8">
+<title>N1 読解トレーナー</title>
+<style>
+  :root{--bg:#faf9f7;--fg:#1a1a1a;--dim:#6b6b6b;--line:#e2e0dc;--card:#fff;
+        --ok:#1a7f4b;--ng:#b3261e;--accent:#2b5c9b;--kan:#c2410c;}
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#16181c;--fg:#e8e6e3;--dim:#9a9894;--line:#2e3238;--card:#1e2126;
+          --ok:#4ade80;--ng:#f87171;--accent:#7aa7e0;--kan:#fb923c;}}
+  *{box-sizing:border-box}
+  body{margin:0;padding:16px;background:var(--bg);color:var(--fg);
+       font:16px/1.85 "Hiragino Mincho ProN","Yu Mincho",serif;
+       max-width:760px;margin-inline:auto}
+  h1{font-size:19px;margin:0 0 4px;font-family:system-ui,sans-serif}
+  .sub,.bar,.meta,button,.stat{font-family:system-ui,sans-serif}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:14px;line-height:1.6}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  button,select{font:14px system-ui,sans-serif;padding:6px 12px;border:1px solid var(--line);
+         border-radius:8px;background:var(--card);color:var(--fg);cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+        padding:20px;margin-bottom:12px}
+  .pas{white-space:pre-wrap;font-size:15.5px;max-height:46vh;overflow:auto;
+       padding-right:6px}
+  .stem{font-size:16.5px;font-weight:600;margin:16px 0 10px;
+        border-left:3px solid var(--accent);padding-left:10px}
+  .opt{display:block;width:100%;text-align:left;margin:7px 0;padding:11px 14px;
+       font:15.5px/1.7 "Hiragino Mincho ProN","Yu Mincho",serif}
+  .opt.ok{background:color-mix(in srgb,var(--ok) 15%,transparent);border-color:var(--ok)}
+  .opt.ng{background:color-mix(in srgb,var(--ng) 15%,transparent);border-color:var(--ng)}
+  .opt.orphan{text-decoration:line-through;opacity:.55}
+  .meta{color:var(--dim);font-size:12px;display:flex;justify-content:space-between;
+        border-top:1px solid var(--line);padding-top:10px;margin-top:14px}
+  .stat{font-variant-numeric:tabular-nums;font-size:13px}
+  .kan{color:var(--kan);font-weight:600}
+  .verdict{font-size:13px;font-family:system-ui,sans-serif;margin-top:12px;
+           padding:10px 12px;border-radius:8px;background:var(--bg);line-height:1.7}
+  kbd{border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:12px}
+</style>
+
+<h1>N1 読解トレーナー</h1>
+<div class="sub">
+  250 道真题。<b>読解每题 2.73 分，是言語知識的 2 倍</b>——最大的单一分块是問題9（8题＝21.8分）。<br>
+  作答后会告诉你 <b>読B 规则</b>会怎么判：把四个选项里<b>汉字与其他三个几乎不重合</b>的那个划掉。
+  <b>关键：只在孤儿比第二名少 ≥3 个汉字时才用</b>——那一档误杀仅 5.6%；
+  差 0–2 个的那一档误杀 17.6%，几乎不比蒙题强，别用。练习器每题都会标出属于哪一档。
+</div>
+
+<div class="bar">
+  <select id="filter">
+    <option value="0">全部大題</option>
+    <option value="8">問題8 短文</option>
+    <option value="9">問題9 中文（分值最大）</option>
+    <option value="10">問題10 長文</option>
+    <option value="11">問題11 統合</option>
+    <option value="12">問題12 主張</option>
+    <option value="13">問題13 情報検索</option>
+  </select>
+  <button id="kanjiBtn">汉字高亮：关</button>
+  <button id="skip">跳过</button>
+  <span class="stat" id="stat"></span>
+</div>
+
+<div class="card">
+  <div class="pas" id="pas"></div>
+  <div class="stem" id="stem"></div>
+  <div id="opts"></div>
+  <div class="verdict" id="verdict" style="display:none"></div>
+  <div class="meta"><span id="src"></span><span id="timer"></span></div>
+</div>
+
+<script>
+const URL_='../export/drill_read.json';
+let all=[],queue=[],cur=null,t0=0,kanji=false;
+let done=0,mine=0,ruleKill=0,ruleHit=0;
+
+const sh=a=>{for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];}return a;};
+const hi=s=>kanji? s.replace(/[一-鿿々]+/g,m=>`<span class="kan">${m}</span>`) : s;
+const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+function render(){
+  const V=document.getElementById('verdict'); V.style.display='none';
+  if(!cur){document.getElementById('pas').textContent='这一组做完了。换个大題继续。';
+           document.getElementById('stem').textContent='';
+           document.getElementById('opts').innerHTML='';return;}
+  document.getElementById('pas').innerHTML=hi(esc(cur.passage||''));
+  document.getElementById('stem').innerHTML=hi(esc(cur.stem||'（本題无独立题干，见文章）'));
+  const box=document.getElementById('opts'); box.innerHTML='';
+  cur.options.forEach((o,i)=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=(i+1)+'　'+hi(esc(o));
+    b.onclick=()=>answer(i+1); box.appendChild(b);
+  });
+  document.getElementById('src').textContent=`${cur.session} 問題${cur.dai} 題${cur.no}`;
+  t0=Date.now(); tick();
+}
+
+function answer(pick){
+  const bs=[...document.querySelectorAll('.opt')];
+  if(bs[0].dataset.done) return;
+  bs.forEach((b,i)=>{
+    b.dataset.done=1;
+    if(i+1===cur.answer) b.classList.add('ok');
+    else if(i+1===pick) b.classList.add('ng');
+    if(i+1===cur.orphan) b.classList.add('orphan');
+  });
+  done++; if(pick===cur.answer) mine++;
+  const killed = cur.orphan===cur.answer;      // 规则误杀了正解
+  if(killed) ruleKill++;
+  if(cur.centroid===cur.answer) ruleHit++;
+  const V=document.getElementById('verdict'); V.style.display='';
+  const conf = cur.margin>=3
+      ? '<span style="color:var(--ok)">可靠档（差≥3，全库误杀 5.6%）</span>'
+      : '<span style="color:var(--ng)">弱档（差'+cur.margin+'，全库误杀 17.6% ≈ 接近蒙题，建议别用）</span>';
+  V.innerHTML =
+    `<b>読B 判定</b>：划掉選択肢 <b>${cur.orphan}</b>（共享汉字最少，`+
+    `四项分别 ${cur.share.join(' / ')}，比第二少 ${cur.margin} 个）<br>可信度：${conf}<br>`+
+    (killed ? `<span style="color:var(--ng)">⚠ 这次划错了——正解就是它</span>`
+            : `<span style="color:var(--ok)">✓ 划对了，正解不在里面</span>`)+
+    `<br><b>重心</b>是選択肢 ${cur.centroid}${cur.centroid===cur.answer?'（正好是正解）':'（不是正解）'}`+
+    `　·　用时 ${((Date.now()-t0)/1000).toFixed(1)} 秒`;
+  stat();
+  if(pick!==cur.answer) queue.push(cur);
+}
+
+function next(){cur=queue.shift()||null;render();}
+function stat(){
+  document.getElementById('stat').textContent =
+    `${done} 题 · 你 ${done?Math.round(mine/done*100):0}% · 読B误杀 ${done?Math.round(ruleKill/done*100):0}% · 重心命中 ${done?Math.round(ruleHit/done*100):0}% · 剩 ${queue.length}`;
+}
+function tick(){if(!cur)return;
+  document.getElementById('timer').textContent=((Date.now()-t0)/1000).toFixed(1)+' 秒';
+  requestAnimationFrame(tick);}
+
+document.getElementById('kanjiBtn').onclick=e=>{
+  kanji=!kanji; e.target.textContent='汉字高亮：'+(kanji?'开':'关');
+  e.target.className=kanji?'primary':''; render();
+};
+document.getElementById('skip').onclick=()=>{queue.push(cur);next();};
+document.getElementById('filter').onchange=e=>{
+  const d=+e.target.value;
+  queue=sh(all.filter(x=>!d||x.dai===d));
+  done=mine=ruleKill=ruleHit=0; stat(); next();
+};
+addEventListener('keydown',e=>{
+  if(['1','2','3','4'].includes(e.key)){
+    const b=document.querySelectorAll('.opt')[+e.key-1]; if(b&&!b.dataset.done) b.click();
+  }
+  if(e.key===' '){e.preventDefault(); next();}
+});
+
+fetch(URL_).then(r=>r.json()).then(d=>{all=d;queue=sh([...d]);stat();next();})
+.catch(()=>{document.getElementById('pas').innerHTML=
+  '<span style="color:var(--ng)">读不到 ../export/drill_read.json。请从仓库根目录起本地服务：<br>'+
+  '<code>python3 -m http.server 8000</code>，再访问 <code>localhost:8000/tools/読解トレーナー.html</code></span>';});
+</script>
