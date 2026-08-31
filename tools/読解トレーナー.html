@@ -43,7 +43,9 @@
   250 道真题。<b>読解每题 2.73 分，是言語知識的 2 倍</b>——最大的单一分块是問題9（8题＝21.8分）。<br>
   作答后会告诉你 <b>読B 规则</b>会怎么判：把四个选项里<b>汉字与其他三个几乎不重合</b>的那个划掉。
   <b>关键：只在孤儿比第二名少 ≥3 个汉字时才用</b>——那一档误杀仅 5.6%；
-  差 0–2 个的那一档误杀 17.6%，几乎不比蒙题强，别用。练习器每题都会标出属于哪一档。
+  差 0–2 个的那一档误杀 17.6%，几乎不比蒙题强，别用。练习器每题都会标出属于哪一档。<br>
+  <b>⚠ 这 250 题是一台胶卷有限的测量仪</b>：每题只有一次「首曝」是干净的测量值，做过就报废。
+  统计只计首曝，错题不会塞回来重做。
 </div>
 
 <div class="bar">
@@ -57,7 +59,9 @@
     <option value="13">問題13 情報検索</option>
   </select>
   <button id="kanjiBtn">汉字高亮：关</button>
+  <button id="probeBtn">只做未见过的（探针）</button>
   <button id="skip">跳过</button>
+  <button id="exp">导出日志</button>
   <span class="stat" id="stat"></span>
 </div>
 
@@ -71,6 +75,22 @@
 
 <script>
 const URL_='../export/drill_read.json';
+const FILM_PREFIX='';
+// ---------- 作答日志（JSONL，存 localStorage，可导出）----------
+const LOG_KEY='jlpt_log_v1', SEEN_KEY='jlpt_seen_v1';
+const seen = new Set(JSON.parse(localStorage.getItem(SEEN_KEY)||'[]'));
+function logAnswer(o){
+  const rows = localStorage.getItem(LOG_KEY)||'';
+  localStorage.setItem(LOG_KEY, rows + JSON.stringify({ts:new Date().toISOString(),...o}) + '\n');
+}
+function markSeen(id){ seen.add(id); localStorage.setItem(SEEN_KEY, JSON.stringify([...seen])); }
+function exportLog(){
+  const b=new Blob([localStorage.getItem(LOG_KEY)||''],{type:'application/x-ndjson'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(b); a.download='jlpt_log.jsonl'; a.click();
+}
+function filmLeft(total){ return total - [...seen].filter(x=>x.startsWith(FILM_PREFIX)).length; }
+
 let all=[],queue=[],cur=null,t0=0,kanji=false;
 let done=0,mine=0,ruleKill=0,ruleHit=0;
 
@@ -104,7 +124,12 @@ function answer(pick){
     else if(i+1===pick) b.classList.add('ng');
     if(i+1===cur.orphan) b.classList.add('orphan');
   });
-  done++; if(pick===cur.answer) mine++;
+  const isFirst = !seen.has(cur.id);
+  logAnswer({tool:'read',mode:isFirst?'probe':'drill',item:cur.id,domain:'read',
+             mondai:cur.dai,first:isFirst,correct:pick===cur.answer,picked:pick,
+             answer:cur.answer,rt_ms:Date.now()-t0,margin:cur.margin,
+             orphan:cur.orphan,centroid:cur.centroid});
+  if(isFirst){ markSeen(cur.id); done++; if(pick===cur.answer) mine++; }
   const killed = cur.orphan===cur.answer;      // 规则误杀了正解
   if(killed) ruleKill++;
   if(cur.centroid===cur.answer) ruleHit++;
@@ -120,13 +145,13 @@ function answer(pick){
     `<br><b>重心</b>是選択肢 ${cur.centroid}${cur.centroid===cur.answer?'（正好是正解）':'（不是正解）'}`+
     `　·　用时 ${((Date.now()-t0)/1000).toFixed(1)} 秒`;
   stat();
-  if(pick!==cur.answer) queue.push(cur);
+  // 不把错题塞回队列——重做的正确率是污染值，不是测量值
 }
 
 function next(){cur=queue.shift()||null;render();}
 function stat(){
   document.getElementById('stat').textContent =
-    `${done} 题 · 你 ${done?Math.round(mine/done*100):0}% · 読B误杀 ${done?Math.round(ruleKill/done*100):0}% · 重心命中 ${done?Math.round(ruleHit/done*100):0}% · 剩 ${queue.length}`;
+    `首曝 ${done} 题 · 你 ${done?Math.round(mine/done*100):0}% · 読B误杀 ${done?Math.round(ruleKill/done*100):0}% · 胶卷剩 ${all.length-seen.size}/${all.length}`;
 }
 function tick(){if(!cur)return;
   document.getElementById('timer').textContent=((Date.now()-t0)/1000).toFixed(1)+' 秒';
@@ -137,6 +162,13 @@ document.getElementById('kanjiBtn').onclick=e=>{
   e.target.className=kanji?'primary':''; render();
 };
 document.getElementById('skip').onclick=()=>{queue.push(cur);next();};
+document.getElementById('exp').onclick=exportLog;
+document.getElementById('probeBtn').onclick=e=>{
+  const on=e.target.className!=='primary';
+  e.target.className=on?'primary':'';
+  e.target.textContent=on?'探针模式：只抽未见':'只做未见过的（探针）';
+  queue=sh(all.filter(x=>!on||!seen.has(x.id))); stat(); next();
+};
 document.getElementById('filter').onchange=e=>{
   const d=+e.target.value;
   queue=sh(all.filter(x=>!d||x.dai===d));

@@ -48,6 +48,7 @@
   <button id="mode" class="primary">考试模式（不看文字）</button>
   <button id="replay">重听 <kbd>R</kbd></button>
   <button id="skip">跳过</button>
+  <button id="exp">导出日志</button>
   <span class="stat" id="stat"></span>
 </div>
 
@@ -68,6 +69,22 @@
 <script>
 const DATA_URL = '../export/drill_soku.json';
 const AUDIO_BASE = '../audio_clips/';
+const FILM_PREFIX='';
+// ---------- 作答日志（JSONL，存 localStorage，可导出）----------
+const LOG_KEY='jlpt_log_v1', SEEN_KEY='jlpt_seen_v1';
+const seen = new Set(JSON.parse(localStorage.getItem(SEEN_KEY)||'[]'));
+function logAnswer(o){
+  const rows = localStorage.getItem(LOG_KEY)||'';
+  localStorage.setItem(LOG_KEY, rows + JSON.stringify({ts:new Date().toISOString(),...o}) + '\n');
+}
+function markSeen(id){ seen.add(id); localStorage.setItem(SEEN_KEY, JSON.stringify([...seen])); }
+function exportLog(){
+  const b=new Blob([localStorage.getItem(LOG_KEY)||''],{type:'application/x-ndjson'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(b); a.download='jlpt_log.jsonl'; a.click();
+}
+function filmLeft(total){ return total - [...seen].filter(x=>x.startsWith(FILM_PREFIX)).length; }
+
 let items = [], queue = [], cur = null, examMode = true, t0 = 0;
 let done = 0, right = 0, wrongList = [];
 
@@ -106,6 +123,11 @@ function answer(pick, btn){
     else if(i+1===pick) b.classList.add('ng');
   });
   document.getElementById('stim').classList.remove('hidden');
+  const isFirst=!seen.has(cur.id);
+  logAnswer({tool:'soku',mode:isFirst?'probe':'drill',item:cur.id,domain:'listen',
+             mondai:4,first:isFirst,correct:pick===cur.answer,picked:pick,
+             answer:cur.answer,rt_ms:Date.now()-t0});
+  markSeen(cur.id);
   done++;
   if(pick===cur.answer) right++;
   else { wrongList.push({...cur, picked:pick, secs});
@@ -149,6 +171,7 @@ document.getElementById('replay').onclick = ()=>{
   const a=document.getElementById('au'); if(a){a.currentTime=0;a.play();}
 };
 document.getElementById('skip').onclick = ()=>{ queue.push(cur); next(); };
+document.getElementById('exp').onclick = exportLog;
 addEventListener('keydown', e=>{
   if(e.key==='r'||e.key==='R') document.getElementById('replay').click();
   if(['1','2','3'].includes(e.key)){
