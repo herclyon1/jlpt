@@ -1,0 +1,160 @@
+<meta charset="utf-8">
+<title>English · 零件 vs 词汇 诊断</title>
+<style>
+  :root{--bg:#faf9f7;--fg:#1a1a1a;--dim:#6b6b6b;--line:#e2e0dc;--card:#fff;
+        --ok:#1a7f4b;--ng:#b3261e;--accent:#2b5c9b;--f:#2b5c9b;--c:#c2410c;}
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#16181c;--fg:#e8e6e3;--dim:#9a9894;--line:#2e3238;--card:#1e2126;
+          --ok:#4ade80;--ng:#f87171;--accent:#7aa7e0;--f:#7aa7e0;--c:#fb923c;}}
+  *{box-sizing:border-box}
+  body{margin:0;padding:16px;background:var(--bg);color:var(--fg);
+       font:16px/1.8 system-ui,sans-serif;max-width:720px;margin-inline:auto}
+  h1{font-size:19px;margin:0 0 4px}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:16px;line-height:1.65}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+        padding:20px;margin-bottom:12px}
+  .ctx{font:18px/1.95 Georgia,"Times New Roman",serif}
+  .blank{display:inline-block;min-width:6em;border-bottom:2.5px solid var(--accent);
+         text-align:center;font-weight:700;color:var(--accent)}
+  .blank.f{border-color:var(--f);color:var(--f)}
+  .blank.c{border-color:var(--c);color:var(--c)}
+  button{font:inherit;padding:8px 14px;border:1px solid var(--line);border-radius:8px;
+         background:var(--card);color:var(--fg);cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  .opt{margin:6px 6px 0 0;font:17px Georgia,serif;min-width:7em}
+  .opt.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);border-color:var(--ok)}
+  .opt.ng{background:color-mix(in srgb,var(--ng) 18%,transparent);border-color:var(--ng)}
+  .tag{font-size:11px;padding:2px 8px;border-radius:99px;color:#fff}
+  .tag.f{background:var(--f)} .tag.c{background:var(--c)}
+  .note{font-size:13.5px;color:var(--dim);margin-top:12px;padding:10px 12px;
+        border-radius:8px;background:var(--bg);display:none}
+  .meta{color:var(--dim);font-size:12px;display:flex;justify-content:space-between;
+        border-top:1px solid var(--line);padding-top:10px;margin-top:14px}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  td,th{padding:8px 6px;border-bottom:1px solid var(--line);text-align:right}
+  th:first-child,td:first-child{text-align:left}
+  .bar{height:9px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:3px}
+  .bar>div{height:100%}
+  .verdict{font-size:14px;line-height:1.85;padding:12px;border-radius:8px;background:var(--bg);margin-top:12px}
+  kbd{border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:12px}
+</style>
+
+<h1>English · 零件 vs 词汇 诊断</h1>
+<div class="sub">
+  和日语版同一个原理，换成英语。<b>60 题：30 道零件 + 30 道词汇，交替出。</b><br>
+  <span class="tag f">零件</span> 介词/连接词/关系词/时体/情态/倒装/虚拟——<b>封闭集</b>，考结构直觉<br>
+  <span class="tag c">词汇</span> 动词/名词/形容词——<b>开放集</b>，考词汇量（难度约 C1，接近 N1 読解的语域）<br>
+  答完给解释。<b>做满 40 题出诊断。</b>按 <kbd>1</kbd>–<kbd>4</kbd> 选。
+</div>
+
+<div class="card">
+  <div class="ctx" id="ctx"></div>
+  <div id="opts" style="margin-top:14px"></div>
+  <div class="note" id="note"></div>
+  <div class="meta"><span id="src"></span><span id="timer"></span></div>
+</div>
+
+<div class="card">
+  <table id="tbl"></table>
+  <div class="verdict" id="verdict"></div>
+  <div style="margin-top:12px">
+    <button id="exp">导出日志</button><button id="reset">清空重来</button></div>
+</div>
+
+<script>
+const URL_='../export/drill_cloze_en.json', LOG='jlpt_log_v1';
+let queue=[],cur=null,t0=0;
+const S={function:{n:0,ok:0,rt:[],bycat:{}},content:{n:0,ok:0,rt:[],bycat:{}}};
+const sh=a=>{for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];}return a;};
+const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+function render(){
+  document.getElementById('note').style.display='none';
+  if(!cur){document.getElementById('ctx').textContent='做完了。';document.getElementById('opts').innerHTML='';return;}
+  const k=cur.kind==='function'?'f':'c';
+  document.getElementById('ctx').innerHTML =
+    `${esc(cur.left)} <span class="blank ${k}" id="bl">?</span> ${esc(cur.right)}`;
+  const box=document.getElementById('opts'); box.innerHTML='';
+  cur._opts.forEach((o,i)=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.textContent=(o===''?'（不填）':o);
+    b.onclick=()=>ans(i,b); box.appendChild(b);
+  });
+  document.getElementById('src').innerHTML =
+    `<span class="tag ${k}">${cur.kind==='function'?'零件':'词汇'}</span> ${cur.cat}`;
+  t0=Date.now(); tick();
+}
+function ans(idx,btn){
+  if(btn.dataset.done) return;
+  const rt=Date.now()-t0, ok=cur._opts[idx]===cur.answer_text;
+  [...document.querySelectorAll('.opt')].forEach((b,i)=>{
+    b.dataset.done=1;
+    if(cur._opts[i]===cur.answer_text) b.classList.add('ok');
+    else if(i===idx) b.classList.add('ng');
+  });
+  document.getElementById('bl').textContent=cur.answer_text===''?'（不填）':cur.answer_text;
+  const N=document.getElementById('note');
+  N.style.display=''; N.innerHTML=`<b>${cur.answer_text===''?'（不填）':cur.answer_text}</b> — ${esc(cur.note)}`;
+  const s=S[cur.kind]; s.n++; s.ok+=ok; s.rt.push(rt);
+  s.bycat[cur.cat]=s.bycat[cur.cat]||[0,0]; s.bycat[cur.cat][0]++; s.bycat[cur.cat][1]+=ok;
+  localStorage.setItem(LOG,(localStorage.getItem(LOG)||'')+JSON.stringify(
+    {ts:new Date().toISOString(),tool:'cloze_en',mode:'probe',item:cur.id,
+     domain:cur.kind,cat:cur.cat,first:true,correct:ok,rt_ms:rt})+'\n');
+  report();
+  setTimeout(()=>{cur=queue.shift()||null;render();}, ok?1400:3200);
+}
+function med(a){if(!a.length)return 0;const b=[...a].sort((x,y)=>x-y);return b[b.length>>1];}
+function report(){
+  document.getElementById('tbl').innerHTML=
+    '<tr><th></th><th>题数</th><th>正确率</th><th>中位反应</th></tr>'+
+    ['function','content'].map(k=>{
+      const s=S[k],r=s.n?s.ok/s.n:0,col=k==='function'?'var(--f)':'var(--c)';
+      return `<tr><td><span class="tag ${k==='function'?'f':'c'}">${k==='function'?'零件':'词汇'}</span></td>
+        <td>${s.n}</td><td><b>${s.n?Math.round(r*100):'—'}%</b>
+        <div class="bar"><div style="width:${r*100}%;background:${col}"></div></div></td>
+        <td>${s.n?(med(s.rt)/1000).toFixed(1)+'s':'—'}</td></tr>`;}).join('');
+  const f=S.function,c=S.content,V=document.getElementById('verdict');
+  if(f.n+c.n<40){V.innerHTML=`<span style="color:var(--dim)">再做 ${40-f.n-c.n} 题给出诊断。</span>`;return;}
+  const rf=f.ok/f.n, rc=c.ok/c.n, d=rf-rc;
+  let v;
+  if(d>0.2) v=`<b>零件 ${Math.round(rf*100)}% ≫ 词汇 ${Math.round(rc*100)}%。</b>
+    和你自己的判断一致：<b>结构没问题，卡在词汇。</b><br>
+    这说明你的英语已经完成了「上半场」——而上半场是那个<b>能靠有限材料练成、并且练完就一劳永逸</b>的部分。
+    你现在面对的是开放集，没有捷径，只有装量。<br>
+    <b>对日语的直接含义</b>：你的日语大概率还没走完上半场。先把日语的零件练到和英语同一水平，
+    那一段是有捷径的、见效最快的；之后才会遇到和英语一样的词汇墙。`;
+  else if(d<-0.2) v=`<b>词汇 ${Math.round(rc*100)}% ≫ 零件 ${Math.round(rf*100)}%。</b>
+    词认识但结构不稳——这和你的自我判断不同，值得注意。<br>
+    好消息是这一半<b>是能练的、见效快的</b>，而且练完对阅读速度的提升是全局性的。`;
+  else if(rf>=0.8&&rc>=0.8) v=`<b>两半都在 80% 以上。</b>英语这个难度带对你不构成瓶颈，
+    题目太简单，测不出你的上限。真正的瓶颈可能在阅读速度或产出（写/说），不在这两项。`;
+  else v=`<b>零件 ${Math.round(rf*100)}% / 词汇 ${Math.round(rc*100)}%，两半接近。</b>
+    没有单一瓶颈，说明是整体输入量的问题，两边都要加。`;
+  const slow = med(f.rt)>4000 ? `<br><span style="color:var(--ng)">⚠ 零件中位反应 ${(med(f.rt)/1000).toFixed(1)} 秒 —— 即使做对了，也还在"想"而不是"本能"。
+    考场上这个速度会吃掉你的阅读时间。</span>` : (f.n>=15?`<br><span style="color:var(--ok)">✓ 零件中位反应 ${(med(f.rt)/1000).toFixed(1)} 秒，已接近本能。</span>`:'');
+  // 分类明细
+  const detail=k=>Object.entries(S[k].bycat).filter(([,v])=>v[0]>=2)
+    .sort((a,b)=>a[1][1]/a[1][0]-b[1][1]/b[1][0])
+    .map(([c,v])=>`${c} ${v[1]}/${v[0]}`).join('　');
+  V.innerHTML=v+slow+
+    `<div style="margin-top:10px;font-size:12.5px;color:var(--dim)">
+       零件分类（弱→强）：${detail('function')||'—'}<br>
+       词汇分类（弱→强）：${detail('content')||'—'}</div>`;
+}
+function tick(){if(!cur)return;
+  document.getElementById('timer').textContent=((Date.now()-t0)/1000).toFixed(1)+'s';
+  requestAnimationFrame(tick);}
+document.getElementById('exp').onclick=()=>{
+  const b=new Blob([localStorage.getItem(LOG)||''],{type:'application/x-ndjson'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='en_log.jsonl';a.click();};
+document.getElementById('reset').onclick=()=>location.reload();
+addEventListener('keydown',e=>{if(['1','2','3','4'].includes(e.key)){
+  const b=document.querySelectorAll('.opt')[+e.key-1];if(b&&!b.dataset.done)b.click();}});
+fetch(URL_).then(r=>r.json()).then(d=>{
+  d.forEach(x=>x._opts=sh([...x.options]));
+  const F=sh(d.filter(x=>x.kind==='function')), C=sh(d.filter(x=>x.kind==='content'));
+  queue=[]; for(let i=0;i<Math.max(F.length,C.length);i++){if(F[i])queue.push(F[i]);if(C[i])queue.push(C[i]);}
+  cur=queue.shift(); render(); report();
+}).catch(()=>{document.getElementById('ctx').innerHTML=
+  '<span style="color:var(--ng)">读不到 ../export/drill_cloze_en.json</span>';});
+</script>
