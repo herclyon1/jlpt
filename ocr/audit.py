@@ -24,6 +24,7 @@ def audit_file(path, sess, sec):
     tot = ok = 0
     bad = []
     dai = None
+    seen_labels = set()      # (大題, 題号) 撞号检查
     for b in re.split(r'^(?=#題 |#大題 )', open(path, encoding='utf-8').read(), flags=re.M):
         md = re.match(r'^#大題 問題(\d+)', b)
         if md:
@@ -34,6 +35,10 @@ def audit_file(path, sess, sec):
             continue
         n = mq.group(1)
         tot += 1
+        if (dai, n) in seen_labels:
+            bad.append(f'{sec} 問題{dai} 題{n}: 題号撞号（同一大題内重复）')
+            continue
+        seen_labels.add((dai, n))
         opts = [x.strip() for x in re.findall(r'^#选 \d (.*)$', b, re.M)]
         need = 3 if (sec == '聴解' and dai == 4) else 4
         ans = re.search(r'^#答 ([1-4])$', b, re.M)
