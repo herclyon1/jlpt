@@ -16,3 +16,6 @@ exams/raw/**/*.png
 exams/raw/**/*.tif
 exams/raw/**/*.tiff
 exams/raw/**/*.heic
+
+# DeepSeek API key 绝不入库
+ocr/.ds_key
