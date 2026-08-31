@@ -44,6 +44,16 @@ def process(sess,sec,dev):
     want=[int(m.group(1)) for m in re.finditer(r'^#題\s+(\d+)',open(src,encoding='utf-8').read(),re.M)]
     key='L' if sec in ('言語知識','読解') else 'T'
     ans=load_answers(sess,want,key)
+    if not ans:
+        # 找不到答案源时，保留目标文件里已有的答案，不要清空
+        old=f'{ROOT}/converted/{sess}_{sec}.txt'
+        if os.path.exists(old):
+            cur2=None
+            for l in open(old,encoding='utf-8'):
+                m2=re.match(r'^#題 (\d+)',l)
+                if m2: cur2=int(m2.group(1))
+                if l.startswith('#答') and cur2: ans[(key,cur2)]=l[3:].strip()
+            if ans: print(f"    无答案源 → 保留原文件已有的 {len(ans)} 个答案")
     out=[]; qn=None; optn=0; body=open(src,encoding='utf-8').read().split('\n')
     if not body[0].startswith('#卷'): out.append(f'#卷 {sess} N1')
     for l in body:
