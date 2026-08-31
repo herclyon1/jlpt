@@ -1,0 +1,141 @@
+<meta charset="utf-8">
+<title>零件 vs 词汇 · 诊断</title>
+<style>
+  :root{--bg:#faf9f7;--fg:#1a1a1a;--dim:#6b6b6b;--line:#e2e0dc;--card:#fff;
+        --ok:#1a7f4b;--ng:#b3261e;--accent:#2b5c9b;--f:#2b5c9b;--c:#c2410c;}
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#16181c;--fg:#e8e6e3;--dim:#9a9894;--line:#2e3238;--card:#1e2126;
+          --ok:#4ade80;--ng:#f87171;--accent:#7aa7e0;--f:#7aa7e0;--c:#fb923c;}}
+  *{box-sizing:border-box}
+  body{margin:0;padding:16px;background:var(--bg);color:var(--fg);
+       font:16px/1.8 system-ui,sans-serif;max-width:720px;margin-inline:auto}
+  h1{font-size:19px;margin:0 0 4px}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:16px;line-height:1.65}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+        padding:20px;margin-bottom:12px}
+  .ctx{font:16.5px/2 "Hiragino Mincho ProN","Yu Mincho",serif}
+  .blank{display:inline-block;min-width:5em;border-bottom:2.5px solid var(--accent);
+         text-align:center;font-weight:700;color:var(--accent)}
+  .blank.f{border-color:var(--f);color:var(--f)}
+  .blank.c{border-color:var(--c);color:var(--c)}
+  button{font:inherit;padding:8px 14px;border:1px solid var(--line);border-radius:8px;
+         background:var(--card);color:var(--fg);cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  .opt{margin:6px 6px 0 0;font-size:17px;min-width:5.5em;
+       font-family:"Hiragino Mincho ProN","Yu Mincho",serif}
+  .opt.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);border-color:var(--ok)}
+  .opt.ng{background:color-mix(in srgb,var(--ng) 18%,transparent);border-color:var(--ng)}
+  .tag{font-size:11px;padding:2px 8px;border-radius:99px;color:#fff}
+  .tag.f{background:var(--f)} .tag.c{background:var(--c)}
+  .meta{color:var(--dim);font-size:12px;display:flex;justify-content:space-between;
+        border-top:1px solid var(--line);padding-top:10px;margin-top:14px}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  td,th{padding:8px 6px;border-bottom:1px solid var(--line);text-align:right}
+  th:first-child,td:first-child{text-align:left}
+  .bar{height:9px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:3px}
+  .bar>div{height:100%}
+  .verdict{font-size:14px;line-height:1.8;padding:12px;border-radius:8px;background:var(--bg);
+           margin-top:12px}
+  kbd{border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:12px}
+</style>
+
+<h1>零件 vs 词汇 · 诊断</h1>
+<div class="sub">
+  把你变成一个语言模型：<b>遮住文章里的一个词，你预测，立刻揭晓</b>——这就是自己造的即时反馈。<br>
+  关键在于<b>两种空分开计分</b>：
+  <span class="tag f">零件</span> 助词/活用/接续（封闭集，考结构直觉）
+  <span class="tag c">词汇</span> 汉字实词（开放集，考词汇量）<br>
+  两条正确率一分开，就知道你到底卡在哪一半。<b>先做 40 题再看结论</b>（下方自动出报告）。
+</div>
+
+<div class="card">
+  <div class="ctx" id="ctx"></div>
+  <div id="opts" style="margin-top:14px"></div>
+  <div class="meta"><span id="src"></span><span id="timer"></span></div>
+</div>
+
+<div class="card">
+  <table id="tbl"></table>
+  <div class="verdict" id="verdict"></div>
+  <div style="margin-top:12px"><button id="exp">导出日志</button>
+    <button id="reset">清空重来</button></div>
+</div>
+
+<script>
+const URL_='../export/drill_cloze.json';
+const LOG='jlpt_log_v1';
+let queue=[],cur=null,t0=0;
+const S={function:{n:0,ok:0,rt:[]},content:{n:0,ok:0,rt:[]}};
+const sh=a=>{for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];}return a;};
+const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+function render(){
+  if(!cur){document.getElementById('ctx').textContent='做完了。';document.getElementById('opts').innerHTML='';return;}
+  const k=cur.kind==='function'?'f':'c';
+  document.getElementById('ctx').innerHTML =
+    `…${esc(cur.left)}<span class="blank ${k}" id="bl">?</span>${esc(cur.right)}…`;
+  const box=document.getElementById('opts'); box.innerHTML='';
+  cur.options.forEach((o,i)=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.textContent=o; b.onclick=()=>ans(i+1,b); box.appendChild(b);
+  });
+  document.getElementById('src').innerHTML =
+    `<span class="tag ${k}">${cur.kind==='function'?'零件':'词汇'}</span> ${cur.session}`;
+  t0=Date.now(); tick();
+}
+function ans(pick,btn){
+  if(btn.dataset.done) return;
+  const rt=Date.now()-t0, ok=pick===cur.answer;
+  [...document.querySelectorAll('.opt')].forEach((b,i)=>{
+    b.dataset.done=1;
+    if(i+1===cur.answer) b.classList.add('ok');
+    else if(i+1===pick) b.classList.add('ng');
+  });
+  document.getElementById('bl').textContent=cur.answer_text;
+  const s=S[cur.kind]; s.n++; s.ok+=ok; s.rt.push(rt);
+  localStorage.setItem(LOG,(localStorage.getItem(LOG)||'')+JSON.stringify(
+    {ts:new Date().toISOString(),tool:'cloze',mode:'probe',item:cur.id,
+     domain:cur.kind,first:true,correct:ok,picked:pick,answer:cur.answer,rt_ms:rt})+'\n');
+  report();
+  setTimeout(()=>{cur=queue.shift()||null;render();}, ok?700:1800);
+}
+function med(a){if(!a.length)return 0;const b=[...a].sort((x,y)=>x-y);return b[b.length>>1];}
+function report(){
+  const rows=[['','题数','正确率','中位反应']];
+  const T=document.getElementById('tbl');
+  T.innerHTML='<tr><th></th><th>题数</th><th>正确率</th><th>中位反应</th></tr>'+
+    ['function','content'].map(k=>{
+      const s=S[k],r=s.n?s.ok/s.n:0,col=k==='function'?'var(--f)':'var(--c)';
+      return `<tr><td><span class="tag ${k==='function'?'f':'c'}">${k==='function'?'零件':'词汇'}</span></td>
+        <td>${s.n}</td><td><b>${s.n?Math.round(r*100):'—'}%</b>
+        <div class="bar"><div style="width:${r*100}%;background:${col}"></div></div></td>
+        <td>${s.n?(med(s.rt)/1000).toFixed(1)+'s':'—'}</td></tr>`;}).join('');
+  const f=S.function,c=S.content;
+  const V=document.getElementById('verdict');
+  if(f.n+c.n<40){V.innerHTML=`<span style="color:var(--dim)">再做 ${40-f.n-c.n} 题给出结论（每类至少 20 题才够判）。</span>`;return;}
+  const rf=f.ok/f.n, rc=c.ok/c.n, d=rf-rc;
+  let v;
+  if(rf>=0.75 && rc>=0.6) v='<b>两半都不错。</b>你的瓶颈可能不在这两项，而在阅读速度或听力。建议直接用 読解トレーナー 的探针模式量真实做题正确率。';
+  else if(d>0.2) v=`<b>零件 ${Math.round(rf*100)}% ≫ 词汇 ${Math.round(rc*100)}%：卡在词汇。</b>结构直觉够用了，再练助词活用是浪费时间。<br>对策：词汇是开放集，没有巧劲，只能按 SRS 装量。优先装<b>汉字词</b>（中文母语者最便宜），假名词表（193 个）次之。`;
+  else if(d<-0.2) v=`<b>词汇 ${Math.round(rc*100)}% ≫ 零件 ${Math.round(rf*100)}%：卡在结构。</b>词认识但句子读不顺——这一半<b>是能靠有限材料练到本能的</b>，而且见效快。<br>对策：盯住反应时间，不是正确率。目标是把中位反应压到 1.5 秒以内。`;
+  else v=`<b>两半都是 ${Math.round(rf*100)}% / ${Math.round(rc*100)}%，齐平且都不高。</b>没有单一瓶颈，说明是整体输入量不够。<br>对策：先攻词汇（它的天花板更高、更线性），零件靠阅读中自然巩固。`;
+  const slow = med(f.rt)>3000 ? '<br><span style="color:var(--ng)">⚠ 零件的中位反应超过 3 秒——即使做对了，也还停留在"想"而不是"本能"。考场上时间不够用。</span>' : '';
+  V.innerHTML=v+slow;
+}
+function tick(){if(!cur)return;
+  document.getElementById('timer').textContent=((Date.now()-t0)/1000).toFixed(1)+'s';
+  requestAnimationFrame(tick);}
+document.getElementById('exp').onclick=()=>{
+  const b=new Blob([localStorage.getItem(LOG)||''],{type:'application/x-ndjson'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='jlpt_log.jsonl';a.click();};
+document.getElementById('reset').onclick=()=>{S.function={n:0,ok:0,rt:[]};S.content={n:0,ok:0,rt:[]};report();};
+addEventListener('keydown',e=>{if(['1','2','3','4'].includes(e.key)){
+  const b=document.querySelectorAll('.opt')[+e.key-1];if(b&&!b.dataset.done)b.click();}});
+fetch(URL_).then(r=>r.json()).then(d=>{
+  // 零件/词汇交替出题，保证两类样本均衡
+  const F=sh(d.filter(x=>x.kind==='function')), C=sh(d.filter(x=>x.kind==='content'));
+  queue=[]; for(let i=0;i<Math.max(F.length,C.length);i++){if(F[i])queue.push(F[i]);if(C[i])queue.push(C[i]);}
+  cur=queue.shift(); render(); report();
+}).catch(()=>{document.getElementById('ctx').innerHTML=
+  '<span style="color:var(--ng)">读不到 ../export/drill_cloze.json。请从仓库根目录起服务：<code>python3 -m http.server 8000</code></span>';});
+</script>
