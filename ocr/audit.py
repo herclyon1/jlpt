@@ -16,9 +16,7 @@ import re, sys, os, glob
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 已知不可修复的缺陷（源数据本身缺失，详见 DEVIATIONS.md）
-UNFIXABLE = {
-    ('2025-07', '聴解', 5, '1'),   # 台本源缺失，選択肢只念不印
-}
+UNFIXABLE = set()   # 已全部修复（2025-07 聴解問5題1 已从音频 whisper 转写补回）
 
 
 def audit_file(path, sess, sec):
