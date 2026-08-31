@@ -7,3 +7,12 @@ Unihan.zip
 *.tsv
 node_modules/
 .DS_Store
+
+# 真题原件只留本地（体积大 + 版权），仓库只存 OCR 文本
+exams/raw/**/*.pdf
+exams/raw/**/*.jpg
+exams/raw/**/*.jpeg
+exams/raw/**/*.png
+exams/raw/**/*.tif
+exams/raw/**/*.tiff
+exams/raw/**/*.heic
