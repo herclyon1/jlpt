@@ -19,3 +19,6 @@ exams/raw/**/*.heic
 
 # DeepSeek API key 绝不入库
 ocr/.ds_key
+
+# 切分出来的听力片段（派生产物 + 版权音频，不入库）
+audio_clips/**/*.mp3
