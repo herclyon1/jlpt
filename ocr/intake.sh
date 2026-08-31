@@ -10,6 +10,7 @@
 #   bash ocr/intake.sh ~/某个目录
 set -u
 SRC="${1:-$HOME/Downloads}"
+SRC="${SRC%/}"
 REPO="/Users/herclyon/JLPT/repo"
 OCRBIN="/Users/herclyon/JLPT/ocr/pdfocr"
 cd "$REPO" || exit 1
@@ -18,11 +19,25 @@ cd "$REPO" || exit 1
 echo "从 $SRC 收取真题文件…"
 mkdir -p exams/raw/待分类
 
+# 先解开压缩包（zip 用系统 unzip；7z 尝试 py7zr）
+TMPX=""
+for a in "$SRC"/*.zip "$SRC"/*.7z; do
+  [ -e "$a" ] || continue
+  [ -z "$TMPX" ] && { TMPX="$(mktemp -d)"; echo "  解压到临时目录…"; }
+  case "$a" in
+    *.zip) unzip -q -o "$a" -d "$TMPX" && echo "    解开 $(basename "$a")" ;;
+    *.7z)  python3 -c "import py7zr,sys;py7zr.SevenZipFile(sys.argv[1]).extractall(sys.argv[2])" "$a" "$TMPX" 2>/dev/null \
+             && echo "    解开 $(basename "$a")" \
+             || echo "    ⚠ 7z 需要: python3 -m pip install --user py7zr" ;;
+  esac
+done
+[ -n "$TMPX" ] && SRC="$TMPX"
+
 guess_session() {   # 从文件名猜场次
   local n="$1" y m
   y=$(echo "$n" | grep -oE '20[0-9]{2}' | head -1)
   [ -z "$y" ] && { y=$(echo "$n" | grep -oE '(^|[^0-9])2[0-9]([^0-9]|$)' | grep -oE '2[0-9]' | head -1); [ -n "$y" ] && y="20$y"; }
-  m=$(echo "$n" | grep -oE '(0?[17]|12)\s*月' | grep -oE '[0-9]+' | head -1)
+  m=$(echo "$n" | grep -oE '(0?[17]|12)[ ]*月' | grep -oE '[0-9]+' | head -1)
   [ -z "$m" ] && m=$(echo "$n" | grep -oE '[-_](0?7|12)[-_]' | grep -oE '[0-9]+' | head -1)
   if [ -n "$y" ] && [ -n "$m" ]; then
     case "$m" in 7|07) echo "$y-07";; 12) echo "$y-12";; *) echo "";; esac
@@ -32,7 +47,10 @@ guess_session() {   # 从文件名猜场次
 moved=0; dup=0
 while IFS= read -r -d '' f; do
   base="$(basename "$f")"
+  reldir="$(dirname "${f#$SRC/}")"
+  # 先用文件名猜, 猜不出再用它所在的目录名猜（你在手机上分好的文件夹）
   sess="$(guess_session "$base")"
+  [ -z "$sess" ] && [ "$reldir" != "." ] && sess="$(guess_session "$reldir")"
   [ -z "$sess" ] && sess="待分类"
   mkdir -p "exams/raw/$sess"
   h="$(shasum -a 256 "$f" | cut -c1-16)"
@@ -44,9 +62,10 @@ while IFS= read -r -d '' f; do
   dst="exams/raw/$sess/$base"
   [ -e "$dst" ] && dst="exams/raw/$sess/${base%.*}_$h.${base##*.}"
   cp "$f" "$dst" && { echo "  → $sess/  $base"; moved=$((moved+1)); }
-done < <(find "$SRC" -maxdepth 1 -type f \( -iname '*.pdf' -o -iname '*.jpg' -o -iname '*.jpeg' \
+done < <(find "$SRC" -type f \( -iname '*.pdf' -o -iname '*.jpg' -o -iname '*.jpeg' \
          -o -iname '*.png' -o -iname '*.tif' -o -iname '*.tiff' -o -iname '*.heic' \) -print0 2>/dev/null)
 
+[ -n "${TMPX:-}" ] && rm -rf "$TMPX"
 echo "收取完成: 新增 $moved 个, 内容重复跳过 $dup 个"
 [ "$moved" -eq 0 ] && exit 0
 
