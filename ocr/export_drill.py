@@ -90,6 +90,18 @@ def main():
         print(f'音频串位、已停用的场次: {sorted(skew)}（重新切片后自动恢复）')
     bad = [x["id"] for x in items if OPT.search(x['stimulus'])]
     print(f'仍含选项标记的: {bad if bad else "无"}')
+    # 同一句刺激出现两次，几乎一定是台本对错了行——2026-07 那次串位就是这么露的马脚。
+    # 真题里同一场次不会考两道一模一样的即時応答。
+    seen = {}
+    dup = []
+    for x in items:
+        k = (x['session'], x['stimulus'])
+        if k in seen:
+            dup.append(f"{seen[k]} 与 {x['id']}")
+        seen[k] = x['id']
+    print(f'同场次刺激句重复的: {dup if dup else "无"}')
+    if dup:
+        print('  ↑ 这是台本串位的典型症状，先查 converted/ 里那份再用')
 
 if __name__ == '__main__':
     main()
