@@ -67,8 +67,15 @@ def load_questions(tag):
         mq = re.match(r'^#題 (\S+)(?:\s*[@＠]文\s*(\S+))?', b)
         if not mq:
             continue
-        m = re.search(r'^#文 \S+\n(.*?)^#文完', b, re.M | re.S)
-        body = m.group(1) if m else pas.get(mq.group(2) or '', '')
+        # 块是按 #題/#大題 切的，#文 不是切点，所以一个写了 @文 的块里嵌着的是
+        # **下一题**的台本。拿它去 ASR 里对齐，切出来的片段整体串位一格。
+        # 2026-07 全卷 30 道题都写了 @文，整卷都是这么切错的。@文 在就以它为准。
+        ref = (mq.group(2) or '').strip()
+        if ref and ref in pas:
+            body = pas[ref]
+        else:
+            m = re.search(r'^#文 \S+\n(.*?)^#文完', b, re.M | re.S)
+            body = m.group(1) if m else ''
         head = norm(re.sub(r'^[男女M F][12]?[：:]', '', body, flags=re.M))[:120]
         qs.append((dai, mq.group(1), head))
     return qs
