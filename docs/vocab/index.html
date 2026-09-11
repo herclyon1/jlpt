@@ -20,7 +20,8 @@ label.ck{font-size:13px;color:var(--ink2);display:inline-flex;gap:4px;align-item
 .stats b{color:var(--ink)}.stats .o{color:var(--out)}
 .pass{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 16px 12px;white-space:pre-wrap;font-size:17px;line-height:2.1;word-break:break-all}
 .pass.bad::before{content:"⚠ 该篇原卷印为「整理中」占位或节选，仅供参考";display:block;white-space:normal;font-size:12.5px;color:var(--out);margin-bottom:8px}
-ruby{ruby-position:under;ruby-align:center}rt{font-size:10px;color:var(--acc);letter-spacing:0;line-height:1;opacity:.9;user-select:none}
+ruby{ruby-position:under;ruby-align:center}rt.en{color:var(--zh);font-family:-apple-system,Helvetica,Arial,sans-serif;letter-spacing:.02em}
+rt{font-size:10px;color:var(--acc);letter-spacing:0;line-height:1;opacity:.9;user-select:none}
 .w{cursor:pointer;border-radius:3px}
 .w.out{text-decoration:underline dotted var(--out) 2px;text-underline-offset:4px;color:var(--out)}
 .w.in{color:inherit}.w.zh{color:inherit}.w.ka{color:inherit}
@@ -47,7 +48,7 @@ ruby{ruby-position:under;ruby-align:center}rt{font-size:10px;color:var(--acc);le
 </style></head><body>
 <div class="wrap">
   <h1>読解 词库分层练习</h1>
-  <p class="sub">11 套 N1 読解 · 选一档覆盖率，档内词标中文，档外词标红；作答后对答案。汉字词与片假名默认视为已认识。</p>
+  <p class="sub">11 套 N1 読解 · 选一档覆盖率，档内词标中文，档外词标红；作答后对答案。汉字词默认视为已认识；片假名标出英文原型。</p>
 
   <div class="bar">
     <select id="selSet"></select>
@@ -58,7 +59,7 @@ ruby{ruby-position:under;ruby-align:center}rt{font-size:10px;color:var(--acc);le
 
   <div class="bar">
     <div class="seg" id="tiers"></div>
-    <label class="ck"><input type="checkbox" id="ckRuby" checked> 档内词显示中文</label>
+    <label class="ck"><input type="checkbox" id="ckRuby" checked> 档内词标中文・片假名标原型</label>
     <label class="ck"><input type="checkbox" id="ckZh" checked> 汉字词/片假名视为已知</label>
     <label class="ck"><input type="checkbox" id="ckPeek"> 允许点击档外词偷看</label>
   </div>
@@ -90,6 +91,7 @@ const LS='rd_vocab_v1'; let store={}; try{store=JSON.parse(localStorage.getItem(
 function save(){try{localStorage.setItem(LS,JSON.stringify(store))}catch(e){}}
 function key(p){return p.set+'/'+p.pid}
 function known(v){ if(v.ff) return v.k<=KOF[tier]; if(v.t==='zh'||v.t==='zi'||v.t==='ka') return $('ckZh').checked?'tr':(false); return v.c!==undefined && v.k<=KOF[tier]; }
+function kaOrig(m){const x=(m||'').match(/^[A-Za-z][A-Za-z\-\.' ]*/); return x?x[0].trim():''}
 function firstSense(m){let s=(m||'').split('／')[0].replace(/[（(][^）)]*[）)]/g,'').replace(/^[A-Za-z][A-Za-z\- ]+ /,'').trim(); if(!s) s=(m||'').split('／')[0]; return s.length>6?s.slice(0,6)+'…':s}
 function render(text,spans,cls){
   let out='',pos=0;
@@ -97,7 +99,8 @@ function render(text,spans,cls){
     if(a>pos) out+=esc(text.slice(pos,a));
     const v=V[vid], k=known(v), sf=esc(text.slice(a,b));
     let c='w '+(k==='tr'?(v.t==='ka'?'ka':'zh'):k?'in':'out');
-    if(k===true && $('ckRuby').checked && v.m) out+=`<ruby class="${c}" data-v="${vid}">${sf}<rt>${esc(firstSense(v.m))}</rt></ruby>`;
+    if(v.t==='ka' && k!==false && $('ckRuby').checked && kaOrig(v.m)) out+=`<ruby class="${c}" data-v="${vid}">${sf}<rt class="en">${esc(kaOrig(v.m))}</rt></ruby>`;
+    else if(k===true && $('ckRuby').checked && v.m) out+=`<ruby class="${c}" data-v="${vid}">${sf}<rt>${esc(firstSense(v.m))}</rt></ruby>`;
     else out+=`<span class="${c}" data-v="${vid}">${sf}</span>`;
     pos=b;
   }
