@@ -20,7 +20,9 @@ label.ck{font-size:13px;color:var(--ink2);display:inline-flex;gap:4px;align-item
 .stats b{color:var(--ink)}.stats .o{color:var(--out)}
 .pass{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 16px 12px;white-space:pre-wrap;font-size:17px;line-height:2.1;word-break:break-all}
 .pass.bad::before{content:"⚠ 该篇原卷印为「整理中」占位或节选，仅供参考";display:block;white-space:normal;font-size:12.5px;color:var(--out);margin-bottom:8px}
-ruby{ruby-position:under;ruby-align:center}rt.en{color:var(--zh);font-family:-apple-system,Helvetica,Arial,sans-serif;letter-spacing:.02em}
+ruby{ruby-position:under;ruby-align:center}rt.gr{color:var(--ink2);opacity:.75}
+.w.gr{color:inherit}.w.fn{color:inherit}
+rt.en{color:var(--zh);font-family:-apple-system,Helvetica,Arial,sans-serif;letter-spacing:.02em}
 rt{font-size:10px;color:var(--acc);letter-spacing:0;line-height:1;opacity:.9;user-select:none}
 .w{cursor:pointer;border-radius:3px}
 .w.out{text-decoration:underline dotted var(--out) 2px;text-underline-offset:4px;color:var(--out)}
@@ -61,12 +63,13 @@ rt{font-size:10px;color:var(--acc);letter-spacing:0;line-height:1;opacity:.9;use
     <div class="seg" id="tiers"></div>
     <label class="ck"><input type="checkbox" id="ckRuby" checked> 档内词标中文・片假名标原型</label>
     <label class="ck"><input type="checkbox" id="ckZh" checked> 汉字词/片假名视为已知</label>
+    <label class="ck"><input type="checkbox" id="ckGram" checked> 文法パターン标注（灰）</label>
     <label class="ck"><input type="checkbox" id="ckPeek"> 允许点击档外词偷看</label>
   </div>
 
   <div class="stats" id="stats"></div>
   <div class="pass" id="pass"></div>
-  <p class="hint">点任意词：看释义、词频名次、进入哪一档。红色虚线＝当前档没背到的词。</p>
+  <p class="hint">点任意词：看释义、词频名次、进入哪一档。红色虚线＝当前档没背到的词。灰字＝文法パターン整块识别；する・いる・こと 这类功能词不标。</p>
   <div class="list" id="list"></div>
   <div class="qs" id="qs"></div>
 </div>
@@ -79,9 +82,10 @@ rt{font-size:10px;color:var(--acc);letter-spacing:0;line-height:1;opacity:.9;use
 </div>
 <div class="pop" id="pop"></div>
 
-<script src="data.js?v=20260911d"></script>
+<script src="data.js?v=20260911e"></script>
 <script>
-const D=window.RD, V=D.vocab, PS=D.passages;
+const D=window.RD, V=D.vocab, PS=D.passages, G=(D.gram||[]).map(g=>({w:g.w,m:g.m,t:'gr',r:'',p:'文法'}));
+function getV(vid){return vid<0?G[-1-vid]:V[vid]}
 const TIERS=[0,...D.tiers];
 const KOF={}; for(const c of D.tiers){KOF[c]=Math.max(...V.filter(v=>v.c!==undefined&&v.c<=c).map(v=>v.k),0);}
 let tier=95, cur=0, peek=false, answers={}, checked=false;
@@ -90,15 +94,17 @@ const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&qu
 const LS='rd_vocab_v1'; let store={}; try{store=JSON.parse(localStorage.getItem(LS)||'{}')}catch(e){}
 function save(){try{localStorage.setItem(LS,JSON.stringify(store))}catch(e){}}
 function key(p){return p.set+'/'+p.pid}
-function known(v){ if(v.ff) return v.k<=KOF[tier]; if(v.t==='zh'||v.t==='zi'||v.t==='ka') return $('ckZh').checked?'tr':(false); return v.c!==undefined && v.k<=KOF[tier]; }
+function known(v){ if(v.t==='gr') return 'gr'; if(v.x) return 'fn'; if(v.ff) return v.k<=KOF[tier]; if(v.t==='zh'||v.t==='zi'||v.t==='ka') return $('ckZh').checked?'tr':(false); return v.c!==undefined && v.k<=KOF[tier]; }
 function kaOrig(m){const x=(m||'').match(/^[A-Za-z][A-Za-z\-\.' ]*/); return x?x[0].trim():''}
 function firstSense(m){let s=(m||'').split('／')[0].replace(/[（(][^）)]*[）)]/g,'').replace(/^[A-Za-z][A-Za-z\- ]+ /,'').trim(); if(!s) s=(m||'').split('／')[0]; return s.length>6?s.slice(0,6)+'…':s}
 function render(text,spans,cls){
   let out='',pos=0;
   for(const [a,b,vid] of spans){
     if(a>pos) out+=esc(text.slice(pos,a));
-    const v=V[vid], k=known(v), sf=esc(text.slice(a,b));
-    let c='w '+(k==='tr'?(v.t==='ka'?'ka':'zh'):k?'in':'out');
+    const v=getV(vid), k=known(v), sf=esc(text.slice(a,b));
+    let c='w '+(k==='gr'?'gr':k==='fn'?'fn':k==='tr'?(v.t==='ka'?'ka':'zh'):k?'in':'out');
+    if(k==='gr'){ out+=(v.m&&$('ckGram').checked)?`<ruby class="${c}" data-v="${vid}">${sf}<rt class="gr">${esc(v.m)}</rt></ruby>`:`<span class="${c}" data-v="${vid}">${sf}</span>`; pos=b; continue; }
+    if(k==='fn'){ out+=`<span class="${c}" data-v="${vid}">${sf}</span>`; pos=b; continue; }
     if(v.t==='ka' && k!==false && $('ckRuby').checked && kaOrig(v.m)) out+=`<ruby class="${c}" data-v="${vid}">${sf}<rt class="en">${esc(kaOrig(v.m))}</rt></ruby>`;
     else if(k===true && $('ckRuby').checked && v.m) out+=`<ruby class="${c}" data-v="${vid}">${sf}<rt>${esc(firstSense(v.m))}</rt></ruby>`;
     else out+=`<span class="${c}" data-v="${vid}">${sf}</span>`;
@@ -126,7 +132,7 @@ function show(){
   $('pass').className='pass'+($('ckRuby').checked?'':' noruby');
   $('pass').innerHTML=render(p.text,p.spans,'');
   // stats
-  const ids=[...new Set(p.spans.map(s=>s[2]))];
+  const ids=[...new Set(p.spans.map(s=>s[2]))].filter(i=>i>=0&&!V[i].x);
   const outs=ids.filter(i=>known(V[i])===false); const ins=ids.filter(i=>known(V[i])===true); const trs=ids.filter(i=>known(V[i])==='tr');
   $('stats').innerHTML=`<span>内容词 <b>${ids.length}</b></span><span>档内 <b>${ins.length}</b></span><span>汉字/片假名 <b>${trs.length}</b></span><span class="o">档外 <b>${outs.length}</b></span><span>${p.text.length} 字</span>`;
   $('list').className='list'; $('list').innerHTML='';
@@ -151,14 +157,16 @@ function check(){
   const h=store[k]; $('hist').innerHTML=Object.keys(h).filter(x=>x!=='done').sort().map(x=>`<span>${tierLabel(+x)} ${h[x].s}/${h[x].n}</span>`).join('');
 }
 function showList(){
-  const p=PS[cur]; const ids=[...new Set([...p.spans,...p.qs.flatMap(q=>[...q.ss,...q.os.flat()])].map(s=>s[2]))].filter(i=>known(V[i])===false);
+  const p=PS[cur]; const ids=[...new Set([...p.spans,...p.qs.flatMap(q=>[...q.ss,...q.os.flat()])].map(s=>s[2]))].filter(i=>i>=0&&!V[i].x&&known(V[i])===false);
   ids.sort((a,b)=>V[a].k-V[b].k);
   $('list').className='list on';
   $('list').innerHTML=`<h3>档外生词 ${ids.length} 个（按词频名次）</h3>`+ids.map(i=>{const v=V[i];return `<div class="it"><b>${esc(v.w)}</b><i>${esc(v.r)}</i><i>${v.k?'#'+v.k+'·'+v.c+'%':''}</i><span>${esc(v.m||'（未收录释义）')}</span></div>`}).join('');
 }
 function pop(vid){
-  const v=V[vid], k=known(v);
-  if(k===false && !$('ckPeek').checked && !checked){ $('pop').innerHTML=`<b>${esc(v.w)}</b> <span class="k">档外词。对答案后可看，或勾选「允许偷看」</span>`; }
+  const v=getV(vid), k=known(v);
+  if(k==='gr'){ $('pop').innerHTML=`<b>${esc(v.w)}</b><span class="tag">文法パターン</span><br>${esc(v.m||'（语法成分，不单独释义）')}`; }
+  else if(k==='fn'){ $('pop').innerHTML=`<b>${esc(v.w)}</b> <span class="k">${esc(v.r)} · ${esc(v.p)}</span><span class="tag">功能词・不标注</span><br>${esc(v.m||'')}`; }
+  else if(k===false && !$('ckPeek').checked && !checked){ $('pop').innerHTML=`<b>${esc(v.w)}</b> <span class="k">档外词。对答案后可看，或勾选「允许偷看」</span>`; }
   else{
     const tag=v.t==='zh'?'汉字词':v.t==='zi'?'汉字可认':v.t==='ka'?'片假名':(v.k?`第 ${v.k} 名 · 累计 ${v.c}%`:'');
     $('pop').innerHTML=`<b>${esc(v.w)}</b> <span class="k">${esc(v.r)} · ${esc(v.p)}${v.j?' · '+v.j:''}</span><span class="tag">${tag}</span>${v.ff?'<span class="tag">⚠ 假朋友</span>':''}<br>${esc(v.m||'（未收录释义）')}`;
@@ -174,7 +182,7 @@ $('selPass').onchange=()=>{ cur=+$('selPass').value; show(); };
 $('prev').onclick=()=>{ if(cur>0){cur--; $('selSet').value=PS[cur].set; buildPass(); show();} };
 $('next').onclick=()=>{ if(cur<PS.length-1){cur++; $('selSet').value=PS[cur].set; buildPass(); show();} };
 $('check').onclick=check; $('showList').onclick=showList; $('reset').onclick=show;
-$('ckRuby').onchange=$('ckZh').onchange=show; $('ckPeek').onchange=()=>{peek=$('ckPeek').checked};
+$('ckRuby').onchange=$('ckZh').onchange=$('ckGram').onchange=show; $('ckPeek').onchange=()=>{peek=$('ckPeek').checked};
 buildTiers(); buildSel(); show();
 </script>
 </body></html>
