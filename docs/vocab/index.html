@@ -118,12 +118,12 @@ function buildSel(){
 }
 function buildPass(){
   const s=$('selSet').value;
-  $('selPass').innerHTML=PS.map((p,i)=>[p,i]).filter(([p])=>p.set===s).map(([p,i])=>`<option value="${i}">${p.dai} ${p.pid}（題${p.qs.map(q=>q.n).join('·')}）${p.bad?'⚠':''}${(store[key(p)]||{}).done?' ✓':''}</option>`).join('');
+  $('selPass').innerHTML=PS.map((p,i)=>[p,i]).filter(([p])=>p.set===s).map(([p,i])=>`<option value="${i}">${p.label}（題${p.qs.map(q=>q.n).join('·')}）${(store[key(p)]||{}).done?' ✓':''}</option>`).join('');
   $('selPass').value=cur;
 }
 function show(){
   const p=PS[cur]; answers={}; checked=false;
-  $('pass').className='pass'+(p.bad?' bad':'')+($('ckRuby').checked?'':' noruby');
+  $('pass').className='pass'+($('ckRuby').checked?'':' noruby');
   $('pass').innerHTML=render(p.text,p.spans,'');
   // stats
   const ids=[...new Set(p.spans.map(s=>s[2]))];
