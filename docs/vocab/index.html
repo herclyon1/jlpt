@@ -79,7 +79,7 @@ rt{font-size:10px;color:var(--acc);letter-spacing:0;line-height:1;opacity:.9;use
 </div>
 <div class="pop" id="pop"></div>
 
-<script src="data.js"></script>
+<script src="data.js?v=20260911d"></script>
 <script>
 const D=window.RD, V=D.vocab, PS=D.passages;
 const TIERS=[0,...D.tiers];
@@ -118,7 +118,7 @@ function buildSel(){
 }
 function buildPass(){
   const s=$('selSet').value;
-  $('selPass').innerHTML=PS.map((p,i)=>[p,i]).filter(([p])=>p.set===s).map(([p,i])=>`<option value="${i}">${p.label}（題${p.qs.map(q=>q.n).join('·')}）${(store[key(p)]||{}).done?' ✓':''}</option>`).join('');
+  $('selPass').innerHTML=PS.map((p,i)=>[p,i]).filter(([p])=>p.set===s).map(([p,i])=>`<option value="${i}">${p.label||p.dai+' '+p.pid}（題${p.qs.map(q=>q.n).join('·')}）${(store[key(p)]||{}).done?' ✓':''}</option>`).join('');
   $('selPass').value=cur;
 }
 function show(){
