@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>読解 词库分层练习</title>
+<style>
+:root{--bg:#f7f6f2;--panel:#fff;--ink:#1f2430;--ink2:#6b7280;--line:#e3e1da;--acc:#2b6cb0;--acc-soft:#e6eff9;--out:#c0392b;--out-soft:#fbeae7;--ok:#2f7d4f;--ok-soft:#e6f3ea;--zh:#7c6f3f;--chip:#efede7}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#15171c;--panel:#1e2128;--ink:#e9eaee;--ink2:#a2a7b3;--line:#333740;--acc:#7fb0ea;--acc-soft:#22314a;--out:#ef8a7c;--out-soft:#3b2320;--ok:#6cc08b;--ok-soft:#1e3327;--zh:#c9b76a;--chip:#2a2e36}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Noto Sans SC",-apple-system,sans-serif;font-size:16px;line-height:1.75}
+.wrap{max-width:820px;margin:0 auto;padding:12px 12px 90px}
+h1{font-size:19px;margin:6px 0 2px}.sub{color:var(--ink2);font-size:12.5px;margin:0 0 10px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px}
+select,button{font:inherit;font-size:14px}
+select{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);max-width:100%}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:9px;padding:6px 12px;cursor:pointer}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}.btn:disabled{opacity:.45;cursor:default}
+.seg{display:flex;flex-wrap:wrap;gap:4px}.seg button{border:1px solid var(--line);background:var(--panel);color:var(--ink2);border-radius:999px;padding:4px 11px;cursor:pointer;font-size:13px;line-height:1.3}
+.seg button[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#fff}
+.seg button small{display:block;font-size:10.5px;opacity:.8}
+label.ck{font-size:13px;color:var(--ink2);display:inline-flex;gap:4px;align-items:center;cursor:pointer}
+.stats{font-size:12.5px;color:var(--ink2);margin:4px 0 8px;display:flex;gap:10px;flex-wrap:wrap}
+.stats b{color:var(--ink)}.stats .o{color:var(--out)}
+.pass{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 16px 12px;white-space:pre-wrap;font-size:17px;line-height:2.1;word-break:break-all}
+.pass.bad::before{content:"⚠ 该篇原卷印为「整理中」占位或节选，仅供参考";display:block;white-space:normal;font-size:12.5px;color:var(--out);margin-bottom:8px}
+ruby{ruby-position:under;ruby-align:center}rt{font-size:10px;color:var(--acc);letter-spacing:0;line-height:1;opacity:.9;user-select:none}
+.w{cursor:pointer;border-radius:3px}
+.w.out{text-decoration:underline dotted var(--out) 2px;text-underline-offset:4px;color:var(--out)}
+.w.in{color:inherit}.w.zh{color:inherit}.w.ka{color:inherit}
+.w.sel{background:var(--acc-soft)}
+.pass.noruby rt{display:none}
+.hint{font-size:12.5px;color:var(--ink2);margin:6px 2px}
+.qs{margin-top:14px}.q{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.q .stem{font-weight:600;font-size:16px;line-height:1.9;white-space:pre-wrap}
+.q .n{display:inline-block;background:var(--chip);border-radius:6px;padding:0 7px;font-size:12.5px;color:var(--ink2);margin-right:6px;font-weight:500}
+.opt{display:flex;gap:8px;align-items:flex-start;padding:6px 6px;border-radius:8px;cursor:pointer;line-height:1.8;white-space:pre-wrap}
+.opt input{margin-top:9px;flex:none;accent-color:var(--acc)}.opt:hover{background:var(--acc-soft)}
+.q.done .opt{cursor:default}.opt.right{background:var(--ok-soft)}.opt.wrong{background:var(--out-soft)}
+.res{font-size:13px;margin-top:6px;color:var(--ink2)}.res.ok{color:var(--ok);font-weight:700}.res.ng{color:var(--out);font-weight:700}
+.foot{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:8px 12px;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;z-index:5}
+.score{font-weight:700}
+.pop{position:fixed;left:50%;transform:translateX(-50%);bottom:64px;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:12px;font-size:14px;max-width:92vw;z-index:9;box-shadow:0 6px 24px rgba(0,0,0,.25);display:none;line-height:1.6}
+.pop.on{display:block}.pop b{font-size:17px}.pop .tag{display:inline-block;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:0 7px;font-size:11.5px;margin-left:6px;opacity:.9}
+.pop .k{opacity:.75;font-size:12px}
+.list{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-top:10px;font-size:14px;display:none}
+.list.on{display:block}.list h3{margin:4px 0 6px;font-size:14px}.list .it{display:flex;gap:8px;padding:3px 0;border-bottom:1px dashed var(--line)}
+.list .it b{min-width:5.5em}.list .it i{font-style:normal;color:var(--ink2);font-size:12px;min-width:4em}
+.hist{font-size:12px;color:var(--ink2)}.hist span{display:inline-block;background:var(--chip);border-radius:6px;padding:0 6px;margin:2px 4px 0 0}
+@media (max-width:480px){.pass{font-size:16px;padding:12px}}
+</style></head><body>
+<div class="wrap">
+  <h1>読解 词库分层练习</h1>
+  <p class="sub">11 套 N1 読解 · 选一档覆盖率，档内词标中文，档外词标红；作答后对答案。汉字词与片假名默认视为已认识。</p>
+
+  <div class="bar">
+    <select id="selSet"></select>
+    <select id="selPass"></select>
+    <button class="btn" id="prev">‹</button><button class="btn" id="next">›</button>
+    <span class="hist" id="hist"></span>
+  </div>
+
+  <div class="bar">
+    <div class="seg" id="tiers"></div>
+    <label class="ck"><input type="checkbox" id="ckRuby" checked> 档内词显示中文</label>
+    <label class="ck"><input type="checkbox" id="ckZh" checked> 汉字词/片假名视为已知</label>
+    <label class="ck"><input type="checkbox" id="ckPeek"> 允许点击档外词偷看</label>
+  </div>
+
+  <div class="stats" id="stats"></div>
+  <div class="pass" id="pass"></div>
+  <p class="hint">点任意词：看释义、词频名次、进入哪一档。红色虚线＝当前档没背到的词。</p>
+  <div class="list" id="list"></div>
+  <div class="qs" id="qs"></div>
+</div>
+
+<div class="foot">
+  <button class="btn pri" id="check">对答案</button>
+  <span class="score" id="score"></span>
+  <button class="btn" id="showList">本篇档外生词</button>
+  <button class="btn" id="reset">重做</button>
+</div>
+<div class="pop" id="pop"></div>
+
+<script src="data.js"></script>
+<script>
+const D=window.RD, V=D.vocab, PS=D.passages;
+const TIERS=[0,...D.tiers];
+const KOF={}; for(const c of D.tiers){KOF[c]=Math.max(...V.filter(v=>v.c!==undefined&&v.c<=c).map(v=>v.k),0);}
+let tier=95, cur=0, peek=false, answers={}, checked=false;
+const $=id=>document.getElementById(id);
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const LS='rd_vocab_v1'; let store={}; try{store=JSON.parse(localStorage.getItem(LS)||'{}')}catch(e){}
+function save(){try{localStorage.setItem(LS,JSON.stringify(store))}catch(e){}}
+function key(p){return p.set+'/'+p.pid}
+function known(v){ if(v.ff) return v.k<=KOF[tier]; if(v.t==='zh'||v.t==='zi'||v.t==='ka') return $('ckZh').checked?'tr':(false); return v.c!==undefined && v.k<=KOF[tier]; }
+function firstSense(m){let s=(m||'').split('／')[0].replace(/[（(][^）)]*[）)]/g,'').replace(/^[A-Za-z][A-Za-z\- ]+ /,'').trim(); if(!s) s=(m||'').split('／')[0]; return s.length>6?s.slice(0,6)+'…':s}
+function render(text,spans,cls){
+  let out='',pos=0;
+  for(const [a,b,vid] of spans){
+    if(a>pos) out+=esc(text.slice(pos,a));
+    const v=V[vid], k=known(v), sf=esc(text.slice(a,b));
+    let c='w '+(k==='tr'?(v.t==='ka'?'ka':'zh'):k?'in':'out');
+    if(k===true && $('ckRuby').checked && v.m) out+=`<ruby class="${c}" data-v="${vid}">${sf}<rt>${esc(firstSense(v.m))}</rt></ruby>`;
+    else out+=`<span class="${c}" data-v="${vid}">${sf}</span>`;
+    pos=b;
+  }
+  out+=esc(text.slice(pos));
+  return out;
+}
+function tierLabel(c){return c===0?'不背':c+'%'}
+function buildTiers(){
+  $('tiers').innerHTML=TIERS.map(c=>`<button aria-pressed="${c===tier}" data-t="${c}">${tierLabel(c)}<small>${c===0?'0 词':KOF[c]+' 词'}</small></button>`).join('');
+}
+function buildSel(){
+  const sets=[...new Set(PS.map(p=>p.set))];
+  $('selSet').innerHTML=sets.map(s=>`<option value="${s}">${s}</option>`).join('');
+  $('selSet').value=PS[cur].set; buildPass();
+}
+function buildPass(){
+  const s=$('selSet').value;
+  $('selPass').innerHTML=PS.map((p,i)=>[p,i]).filter(([p])=>p.set===s).map(([p,i])=>`<option value="${i}">${p.dai} ${p.pid}（題${p.qs.map(q=>q.n).join('·')}）${p.bad?'⚠':''}${(store[key(p)]||{}).done?' ✓':''}</option>`).join('');
+  $('selPass').value=cur;
+}
+function show(){
+  const p=PS[cur]; answers={}; checked=false;
+  $('pass').className='pass'+(p.bad?' bad':'')+($('ckRuby').checked?'':' noruby');
+  $('pass').innerHTML=render(p.text,p.spans,'');
+  // stats
+  const ids=[...new Set(p.spans.map(s=>s[2]))];
+  const outs=ids.filter(i=>known(V[i])===false); const ins=ids.filter(i=>known(V[i])===true); const trs=ids.filter(i=>known(V[i])==='tr');
+  $('stats').innerHTML=`<span>内容词 <b>${ids.length}</b></span><span>档内 <b>${ins.length}</b></span><span>汉字/片假名 <b>${trs.length}</b></span><span class="o">档外 <b>${outs.length}</b></span><span>${p.text.length} 字</span>`;
+  $('list').className='list'; $('list').innerHTML='';
+  $('qs').innerHTML=p.qs.map((q,qi)=>`<div class="q" id="q${qi}"><div class="stem"><span class="n">題${q.n}</span>${render(q.stem,q.ss,'')}</div>`+
+    q.opts.map((o,oi)=>`<label class="opt"><input type="radio" name="q${qi}" value="${oi+1}"><span>${oi+1}．${render(o,q.os[oi],'')}</span></label>`).join('')+`<div class="res" id="r${qi}"></div></div>`).join('');
+  $('score').textContent='';
+  const h=store[key(p)]||{}; $('hist').innerHTML=Object.keys(h).filter(k=>k!=='done').sort().map(k=>`<span>${tierLabel(+k)} ${h[k].s}/${h[k].n}</span>`).join('');
+  window.scrollTo(0,0);
+}
+function check(){
+  const p=PS[cur]; let s=0,n=0;
+  p.qs.forEach((q,qi)=>{
+    const sel=document.querySelector(`input[name=q${qi}]:checked`); const a=sel?+sel.value:0; n++;
+    const box=$('q'+qi); box.classList.add('done');
+    box.querySelectorAll('.opt').forEach((el,oi)=>{ if(oi+1===q.ans) el.classList.add('right'); else if(a===oi+1) el.classList.add('wrong'); });
+    const r=$('r'+qi);
+    if(!q.ans){ r.textContent='此题原卷答案缺失'; return; }
+    if(a===q.ans){ s++; r.textContent='✓ 正确'; r.className='res ok'; } else { r.textContent=(a?'✗ 你选 '+a+'，':'未作答，')+'正解 '+q.ans; r.className='res ng'; }
+  });
+  checked=true; $('score').textContent=`本篇 ${s}/${n}`;
+  const k=key(p); store[k]=store[k]||{}; store[k][tier]={s,n,t:Date.now()}; store[k].done=1; save(); buildPass();
+  const h=store[k]; $('hist').innerHTML=Object.keys(h).filter(x=>x!=='done').sort().map(x=>`<span>${tierLabel(+x)} ${h[x].s}/${h[x].n}</span>`).join('');
+}
+function showList(){
+  const p=PS[cur]; const ids=[...new Set([...p.spans,...p.qs.flatMap(q=>[...q.ss,...q.os.flat()])].map(s=>s[2]))].filter(i=>known(V[i])===false);
+  ids.sort((a,b)=>V[a].k-V[b].k);
+  $('list').className='list on';
+  $('list').innerHTML=`<h3>档外生词 ${ids.length} 个（按词频名次）</h3>`+ids.map(i=>{const v=V[i];return `<div class="it"><b>${esc(v.w)}</b><i>${esc(v.r)}</i><i>${v.k?'#'+v.k+'·'+v.c+'%':''}</i><span>${esc(v.m||'（未收录释义）')}</span></div>`}).join('');
+}
+function pop(vid){
+  const v=V[vid], k=known(v);
+  if(k===false && !$('ckPeek').checked && !checked){ $('pop').innerHTML=`<b>${esc(v.w)}</b> <span class="k">档外词。对答案后可看，或勾选「允许偷看」</span>`; }
+  else{
+    const tag=v.t==='zh'?'汉字词':v.t==='zi'?'汉字可认':v.t==='ka'?'片假名':(v.k?`第 ${v.k} 名 · 累计 ${v.c}%`:'');
+    $('pop').innerHTML=`<b>${esc(v.w)}</b> <span class="k">${esc(v.r)} · ${esc(v.p)}${v.j?' · '+v.j:''}</span><span class="tag">${tag}</span>${v.ff?'<span class="tag">⚠ 假朋友</span>':''}<br>${esc(v.m||'（未收录释义）')}`;
+  }
+  $('pop').classList.add('on'); clearTimeout(pop.t); pop.t=setTimeout(()=>$('pop').classList.remove('on'),4000);
+}
+document.addEventListener('click',e=>{
+  const w=e.target.closest('.w'); if(w){ pop(+w.dataset.v); return; }
+  const t=e.target.closest('#tiers button'); if(t){ tier=+t.dataset.t; buildTiers(); show(); return; }
+});
+$('selSet').onchange=()=>{ buildPass(); cur=+$('selPass').value; show(); };
+$('selPass').onchange=()=>{ cur=+$('selPass').value; show(); };
+$('prev').onclick=()=>{ if(cur>0){cur--; $('selSet').value=PS[cur].set; buildPass(); show();} };
+$('next').onclick=()=>{ if(cur<PS.length-1){cur++; $('selSet').value=PS[cur].set; buildPass(); show();} };
+$('check').onclick=check; $('showList').onclick=showList; $('reset').onclick=show;
+$('ckRuby').onchange=$('ckZh').onchange=show; $('ckPeek').onchange=()=>{peek=$('ckPeek').checked};
+buildTiers(); buildSel(); show();
+</script>
+</body></html>
