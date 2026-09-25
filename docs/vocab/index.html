@@ -82,7 +82,7 @@ rt{font-size:10px;color:var(--acc);letter-spacing:0;line-height:1;opacity:.9;use
 </div>
 <div class="pop" id="pop"></div>
 
-<script src="data.js?v=20260924a"></script>
+<script src="data.js?v=20260925a"></script>
 <script>
 const D=window.RD, V=D.vocab, PS=D.passages, G=(D.gram||[]).map(g=>({w:g.w,m:g.m,t:'gr',r:'',p:'文法'}));
 function getV(vid){return vid<0?G[-1-vid]:V[vid]}
@@ -124,8 +124,8 @@ function buildSel(){
 }
 function buildPass(){
   const s=$('selSet').value;
-  $('selPass').innerHTML=PS.map((p,i)=>[p,i]).filter(([p])=>p.set===s).map(([p,i])=>`<option value="${i}">${p.label||p.dai+' '+p.pid}（題${p.qs.map(q=>q.n).join('·')}）${(store[key(p)]||{}).done?' ✓':''}</option>`).join('');
-  $('selPass').value=cur;
+  $('selPass').innerHTML=PS.map((p,i)=>[p,i]).filter(([p])=>p.set===s).map(([p,i])=>`<option value="${i}">${p.label||p.dai+' '+p.pid}${p.qs.length?'（題'+p.qs.map(q=>q.n).join('·')+'）':''}${(store[key(p)]||{}).done?' ✓':''}</option>`).join('');
+  $('selPass').value=cur; if($('selPass').selectedIndex<0) $('selPass').selectedIndex=0;
 }
 function show(){
   const p=PS[cur]; answers={}; checked=false;
@@ -144,6 +144,7 @@ function show(){
 }
 function check(){
   const p=PS[cur]; let s=0,n=0;
+  if(!p.qs.length){ checked=true; $('score').textContent='本篇未收录题目（原卷只拍到文章），已解锁档外词释义'; return; }
   p.qs.forEach((q,qi)=>{
     const sel=document.querySelector(`input[name=q${qi}]:checked`); const a=sel?+sel.value:0; n++;
     const box=$('q'+qi); box.classList.add('done');
@@ -158,7 +159,7 @@ function check(){
 }
 function showList(){
   const p=PS[cur]; const ids=[...new Set([...p.spans,...p.qs.flatMap(q=>[...q.ss,...q.os.flat()])].map(s=>s[2]))].filter(i=>i>=0&&!V[i].x&&known(V[i])===false);
-  ids.sort((a,b)=>V[a].k-V[b].k);
+  ids.sort((a,b)=>(V[a].k||1e9)-(V[b].k||1e9));
   $('list').className='list on';
   $('list').innerHTML=`<h3>档外生词 ${ids.length} 个（按词频名次）</h3>`+ids.map(i=>{const v=V[i];return `<div class="it"><b>${esc(v.w)}</b><i>${esc(v.r)}</i><i>${v.k?'#'+v.k+'·'+v.c+'%':''}</i><span>${esc(v.m||'（未收录释义）')}</span></div>`}).join('');
 }
@@ -168,7 +169,7 @@ function pop(vid){
   else if(k==='fn'){ $('pop').innerHTML=`<b>${esc(v.w)}</b> <span class="k">${esc(v.r)} · ${esc(v.p)}</span><span class="tag">功能词・不标注</span><br>${esc(v.m||'')}`; }
   else if(k===false && !$('ckPeek').checked && !checked){ $('pop').innerHTML=`<b>${esc(v.w)}</b> <span class="k">档外词。对答案后可看，或勾选「允许偷看」</span>`; }
   else{
-    const tag=v.t==='zh'?'汉字词':v.t==='zi'?'汉字可认':v.t==='ka'?'片假名':(v.k?`第 ${v.k} 名 · 累计 ${v.c}%`:'');
+    const tag=v.t==='zh'?'汉字词':v.t==='zi'?'汉字可认':v.t==='ka'?'片假名':(v.k?`第 ${v.k} 名 · 累计 ${v.c}%`:v.ex?'11 套真题未出现':'');
     $('pop').innerHTML=`<b>${esc(v.w)}</b> <span class="k">${esc(v.r)} · ${esc(v.p)}${v.j?' · '+v.j:''}</span><span class="tag">${tag}</span>${v.ff?'<span class="tag">⚠ 假朋友</span>':''}<br>${esc(v.m||'（未收录释义）')}`;
   }
   $('pop').classList.add('on'); clearTimeout(pop.t); pop.t=setTimeout(()=>$('pop').classList.remove('on'),4000);
